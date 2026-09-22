@@ -77,6 +77,9 @@ type BatchItem struct {
 	OverrideCPU    *domain.ResourceAmount
 	OverrideMemory *domain.ResourceAmount
 
+	CPULimit    *domain.LimitSpec
+	MemoryLimit *domain.LimitSpec
+
 	IdempotencyKey string
 
 	// Patcher performs this item's file edit; resolved by the caller from a

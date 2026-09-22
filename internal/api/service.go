@@ -29,6 +29,10 @@ var ErrRecommendationNotFound = errors.New("api: recommendation not found")
 // have hidden the "Accept suggestion" button.
 var ErrRecommendationNotEligible = errors.New("api: recommendation is not eligible for selection")
 
+// ErrInvalidSelectRequest is returned when a select request carries an
+// out-of-range option (e.g. limitHeadroomPercent >= 100).
+var ErrInvalidSelectRequest = errors.New("api: invalid select request")
+
 // Service composes the read-side contracts (VpaRecommendationReader,
 // GitOpsTargetResolver, workloadresources.Reader, StateStore) into the data
 // the dashboard needs. It performs no write-back of its own in this phase
@@ -229,6 +233,10 @@ func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 
 	dto.CurrentCPU = quantityString(eval.Current.CPU)
 	dto.CurrentMemory = quantityString(eval.Current.Memory)
+	dto.CurrentCPULimit = quantityString(eval.CurrentLimits.CPU)
+	dto.CurrentMemoryLimit = quantityString(eval.CurrentLimits.Memory)
+	dto.CPULimitConfigured = eval.Target.CPULimitKeyPath != ""
+	dto.MemoryLimitConfigured = eval.Target.MemoryLimitKeyPath != ""
 	dto.DeltaCPUAbsoluteMilli = eval.CPUDelta.AbsoluteMilli
 	dto.DeltaCPUPercent = finitePercent(eval.CPUDelta)
 	dto.DeltaMemoryAbsoluteMilli = eval.MemoryDelta.AbsoluteMilli
@@ -252,11 +260,12 @@ func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 // SelectRecommendation (which must reach the identical eligibility verdict
 // the dashboard just showed the user before queuing a selection).
 type evaluation struct {
-	Target      domain.WriteTarget
-	Current     domain.ResourceAmount
-	CPUDelta    eligibility.Delta
-	MemoryDelta eligibility.Delta
-	Eligibility eligibility.Result
+	Target        domain.WriteTarget
+	Current       domain.ResourceAmount
+	CurrentLimits domain.ResourceAmount
+	CPUDelta      eligibility.Delta
+	MemoryDelta   eligibility.Delta
+	Eligibility   eligibility.Result
 }
 
 func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation) (evaluation, error) {
@@ -268,11 +277,13 @@ func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 	}
 	eval.Target = target
 
-	current, err := s.WorkloadReader.CurrentValues(ctx, vpa.Workload, cr.ContainerName)
+	values, err := s.WorkloadReader.CurrentValues(ctx, vpa.Workload, cr.ContainerName)
 	if err != nil {
 		return eval, fmt.Errorf("reading current values from live workload: %w", err)
 	}
+	current := values.Requests
 	eval.Current = current
+	eval.CurrentLimits = values.Limits
 
 	eval.CPUDelta = eligibility.ComputeDelta(current.CPU, cr.Target.CPU)
 	eval.MemoryDelta = eligibility.ComputeDelta(current.Memory, cr.Target.Memory)
@@ -285,6 +296,43 @@ func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 	})
 
 	return eval, nil
+}
+
+// SelectOptions is what a caller asks a selection to apply: which
+// resources, and optionally how to set each one's limit (see
+// domain.LimitSpec; nil leaves that limit untouched).
+type SelectOptions struct {
+	ApplyCPU    bool
+	ApplyMemory bool
+	CPULimit    *domain.LimitSpec
+	MemoryLimit *domain.LimitSpec
+}
+
+func (o SelectOptions) validate() error {
+	if !o.ApplyCPU && !o.ApplyMemory {
+		return fmt.Errorf("%w: no resource selected", ErrRecommendationNotEligible)
+	}
+	if o.CPULimit != nil {
+		if err := o.CPULimit.Validate(true); err != nil {
+			return fmt.Errorf("%w: cpu limit: %v", ErrInvalidSelectRequest, err)
+		}
+	}
+	if o.MemoryLimit != nil {
+		if err := o.MemoryLimit.Validate(false); err != nil {
+			return fmt.Errorf("%w: memory limit: %v", ErrInvalidSelectRequest, err)
+		}
+	}
+	return nil
+}
+
+// checkAbsoluteLimit rejects an absolute limit below the recommendation it
+// would sit above -- Kubernetes rejects request > limit, so queuing it would
+// only fail later at write-back (or worse, at Argo CD sync).
+func checkAbsoluteLimit(resourceName string, spec *domain.LimitSpec, recommended *resource.Quantity) error {
+	if spec == nil || spec.Value == nil || recommended == nil || spec.Value.Cmp(*recommended) >= 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: %s limit %s is below the recommended request %s", ErrInvalidSelectRequest, resourceName, spec.Value.String(), recommended.String())
 }
 
 // findContainer locates the opted-in, valid VPA + container recommendation
@@ -320,7 +368,9 @@ func (s *Service) findContainer(ctx context.Context, namespace, vpaName, contain
 // resource that isn't configured/eligible for this particular container,
 // only failing if *nothing* requested ends up selectable -- a bulk action
 // must never abort the whole batch over one container.
-func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, applyCPU, applyMemory, strict bool) (domain.PendingSelection, error) {
+func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, opts SelectOptions, strict bool) (domain.PendingSelection, error) {
+	applyCPU, applyMemory := opts.ApplyCPU, opts.ApplyMemory
+
 	eval, err := s.evaluate(ctx, vpa, cr)
 	if err != nil {
 		return domain.PendingSelection{}, fmt.Errorf("%w: %v", ErrRecommendationNotFound, err)
@@ -359,11 +409,28 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		return domain.PendingSelection{}, fmt.Errorf("%w: no requested resource is configured and eligible", ErrRecommendationNotEligible)
 	}
 
+	// A limit spec only travels with the resource it belongs to.
+	var cpuLimit, memoryLimit *domain.LimitSpec
+	if wantCPU {
+		cpuLimit = opts.CPULimit
+		if err := checkAbsoluteLimit("cpu", cpuLimit, cr.Target.CPU); err != nil {
+			return domain.PendingSelection{}, err
+		}
+	}
+	if wantMemory {
+		memoryLimit = opts.MemoryLimit
+		if err := checkAbsoluteLimit("memory", memoryLimit, cr.Target.Memory); err != nil {
+			return domain.PendingSelection{}, err
+		}
+	}
+
 	patchReq := domain.PatchRequest{
 		Target:         eval.Target,
 		Recommendation: cr,
 		ApplyCPU:       wantCPU,
 		ApplyMemory:    wantMemory,
+		CPULimit:       cpuLimit,
+		MemoryLimit:    memoryLimit,
 	}
 
 	return domain.PendingSelection{
@@ -376,6 +443,8 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		ApplyCPU:              wantCPU,
 		ApplyMemory:           wantMemory,
 		RecommendationSummary: cr.Target,
+		CPULimit:              cpuLimit,
+		MemoryLimit:           memoryLimit,
 	}, nil
 }
 
@@ -415,9 +484,9 @@ func replaceSelection(list []domain.PendingSelection, sel domain.PendingSelectio
 // for that seam, not yet wired up). Re-selecting the same container
 // replaces any earlier pending selection for it rather than accumulating
 // duplicates.
-func (s *Service) SelectRecommendation(ctx context.Context, namespace, vpaName, containerName string, applyCPU, applyMemory bool) (domain.PendingSelection, error) {
-	if !applyCPU && !applyMemory {
-		return domain.PendingSelection{}, fmt.Errorf("%w: no resource selected", ErrRecommendationNotEligible)
+func (s *Service) SelectRecommendation(ctx context.Context, namespace, vpaName, containerName string, opts SelectOptions) (domain.PendingSelection, error) {
+	if err := opts.validate(); err != nil {
+		return domain.PendingSelection{}, err
 	}
 
 	vpa, cr, found, err := s.findContainer(ctx, namespace, vpaName, containerName)
@@ -428,7 +497,7 @@ func (s *Service) SelectRecommendation(ctx context.Context, namespace, vpaName, 
 		return domain.PendingSelection{}, ErrRecommendationNotFound
 	}
 
-	sel, err := s.buildSelection(ctx, vpa, cr, applyCPU, applyMemory, true)
+	sel, err := s.buildSelection(ctx, vpa, cr, opts, true)
 	if err != nil {
 		return domain.PendingSelection{}, err
 	}
@@ -443,9 +512,9 @@ func (s *Service) SelectRecommendation(ctx context.Context, namespace, vpaName, 
 // containers where the requested resource(s) aren't configured or
 // individually eligible. All selections are written in a single
 // StateStore.Update rather than one per container.
-func (s *Service) BulkSelectRecommendations(ctx context.Context, applyCPU, applyMemory bool) (BulkSelectResponse, error) {
-	if !applyCPU && !applyMemory {
-		return BulkSelectResponse{}, fmt.Errorf("%w: no resource selected", ErrRecommendationNotEligible)
+func (s *Service) BulkSelectRecommendations(ctx context.Context, opts SelectOptions) (BulkSelectResponse, error) {
+	if err := opts.validate(); err != nil {
+		return BulkSelectResponse{}, err
 	}
 
 	vpas, err := s.Reader.ListOptedIn(ctx)
@@ -467,7 +536,7 @@ func (s *Service) BulkSelectRecommendations(ctx context.Context, applyCPU, apply
 				})
 				continue
 			}
-			sel, err := s.buildSelection(ctx, vpa, cr, applyCPU, applyMemory, false)
+			sel, err := s.buildSelection(ctx, vpa, cr, opts, false)
 			if err != nil {
 				result.Skipped = append(result.Skipped, SkippedSelectionDTO{
 					Namespace: vpa.Namespace, VPAName: vpa.Name, ContainerName: cc.ContainerName,

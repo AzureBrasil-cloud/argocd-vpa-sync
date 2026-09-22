@@ -74,9 +74,24 @@ func isPlainNumber(raw string) bool {
 // instead. Falls back to q.String() if existingRaw's suffix isn't
 // recognized.
 func formatLikeExisting(existingRaw string, q resource.Quantity) string {
+	return formatLikeExistingRounded(existingRaw, q, false)
+}
+
+// formatLikeExistingRounded is formatLikeExisting, rounding up instead of
+// to nearest when roundUp is set (used for limits, which must never end up
+// below the value they were computed to cover).
+func formatLikeExistingRounded(existingRaw string, q resource.Quantity, roundUp bool) string {
+	div := roundDiv
+	if roundUp {
+		div = ceilDiv
+	}
+
 	suf, ok := suffixOf(existingRaw)
 	if !ok {
 		return q.String()
+	}
+	if roundUp {
+		suf = finerSuffixIfInexact(suf, q.Value())
 	}
 
 	switch {
@@ -85,9 +100,9 @@ func formatLikeExisting(existingRaw string, q resource.Quantity) string {
 	case suf == "m":
 		return fmt.Sprintf("%dm", q.MilliValue())
 	case binarySuffixScale[suf] != 0:
-		return fmt.Sprintf("%d%s", roundDiv(q.Value(), binarySuffixScale[suf]), suf)
+		return fmt.Sprintf("%d%s", div(q.Value(), binarySuffixScale[suf]), suf)
 	case decimalSuffixScale[suf] != 0:
-		return fmt.Sprintf("%d%s", roundDiv(q.Value(), decimalSuffixScale[suf]), suf)
+		return fmt.Sprintf("%d%s", div(q.Value(), decimalSuffixScale[suf]), suf)
 	default:
 		return q.String()
 	}
@@ -122,4 +137,30 @@ func roundDiv(a, b int64) int64 {
 		return (a + b/2) / b
 	}
 	return -((-a + b/2) / b)
+}
+
+// finerSuffixIfInexact steps a unit coarser than Mi/M (Gi, Ti, G, ...) down
+// to Mi/M when v isn't a whole multiple of it. Rounding a limit UP in a
+// coarse unit can overshoot by almost a whole unit -- 250Mi would become
+// 1Gi -- which would make a computed limit unable to ever go down.
+func finerSuffixIfInexact(suf string, v int64) string {
+	if scale := binarySuffixScale[suf]; scale > binarySuffixScale["Mi"] && v%scale != 0 {
+		return "Mi"
+	}
+	if scale := decimalSuffixScale[suf]; scale > decimalSuffixScale["M"] && v%scale != 0 {
+		return "M"
+	}
+	return suf
+}
+
+// ceilDiv divides a by b, rounding up (toward +infinity).
+func ceilDiv(a, b int64) int64 {
+	if b == 0 {
+		return a
+	}
+	q := a / b
+	if a%b != 0 && (a > 0) == (b > 0) {
+		q++
+	}
+	return q
 }

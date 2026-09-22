@@ -70,7 +70,7 @@ func writeSelectError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrRecommendationNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, ErrRecommendationNotEligible):
+	case errors.Is(err, ErrRecommendationNotEligible), errors.Is(err, ErrInvalidSelectRequest):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -93,7 +93,12 @@ func (s *Server) handleSelectRecommendation(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	sel, err := s.service.SelectRecommendation(r.Context(), namespace, vpaName, containerName, req.ApplyCPU, req.ApplyMemory)
+	opts, err := req.options()
+	if err != nil {
+		writeSelectError(w, err)
+		return
+	}
+	sel, err := s.service.SelectRecommendation(r.Context(), namespace, vpaName, containerName, opts)
 	if err != nil {
 		writeSelectError(w, err)
 		return
@@ -112,7 +117,12 @@ func (s *Server) handleBulkSelectRecommendations(w http.ResponseWriter, r *http.
 		return
 	}
 
-	result, err := s.service.BulkSelectRecommendations(r.Context(), req.ApplyCPU, req.ApplyMemory)
+	opts, err := req.options()
+	if err != nil {
+		writeSelectError(w, err)
+		return
+	}
+	result, err := s.service.BulkSelectRecommendations(r.Context(), opts)
 	if err != nil {
 		writeSelectError(w, err)
 		return

@@ -28,11 +28,17 @@ const DefaultMinChangePercent = 10.0
 // v1alpha1.ContainerWriteBackConfig (internal/apis/vpagitopsbinding/v1alpha1),
 // built by internal/controller from a VpaGitOpsBinding CR.
 type ContainerWriteBackConfig struct {
-	ContainerName    string
-	ManifestType     SourceType
-	ManifestPath     string
-	CPUKeyPath       string
-	MemoryKeyPath    string
+	ContainerName string
+	ManifestType  SourceType
+	ManifestPath  string
+	CPUKeyPath    string
+	MemoryKeyPath string
+
+	// CPULimitKeyPath / MemoryLimitKeyPath locate the matching limit; empty
+	// means write-back never touches that limit (they're never inferred).
+	CPULimitKeyPath    string
+	MemoryLimitKeyPath string
+
 	MinChangePercent *float64
 }
 

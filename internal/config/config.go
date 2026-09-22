@@ -34,7 +34,7 @@ type Config struct {
 func Default() Config {
 	return Config{
 		ListenAddr:            ":8080",
-		StateSecretNamespace:  "argocd-vpa-updater",
+		StateSecretNamespace:  "argocd",
 		StateSecretName:       "argocd-vpa-updater-state",
 		ArgoCDNamespace:       "argocd",
 		WriteBackPollInterval: 20 * time.Second,

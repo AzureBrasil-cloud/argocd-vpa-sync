@@ -11,6 +11,7 @@ import {
   type SelectedRow,
 } from "../components/SelectionSummary";
 import { StatusBadge } from "../components/StatusBadge";
+import { useLimitSettings } from "../lib/useLimitSettings";
 
 type RowKey = string;
 type ViewMode = "table" | "cards";
@@ -125,6 +126,7 @@ export function RecommendationList() {
 
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const limits = useLimitSettings();
 
   const [sort, setSort] = useState<SortState>({
     key: "namespace",
@@ -179,6 +181,14 @@ export function RecommendationList() {
     return () => clearInterval(id);
   }, [hasInFlightWriteBack, load]);
 
+  // A resource being applied needs a valid limit setting for it.
+  function limitsValidFor(sel: RowSelection): boolean {
+    return (
+      (!sel.cpu || limits.parsed.cpu !== null) &&
+      (!sel.memory || limits.parsed.memory !== null)
+    );
+  }
+
   function toggle(key: RowKey, resource: "cpu" | "memory", checked: boolean) {
     setSelection((prev) => ({
       ...prev,
@@ -190,6 +200,10 @@ export function RecommendationList() {
     const key = rowKey(item);
     const sel = selection[key] ?? EMPTY_SELECTION;
     if (!sel.cpu && !sel.memory) return;
+    if (!limitsValidFor(sel)) {
+      setRowError((prev) => ({ ...prev, [key]: "invalid limit setting" }));
+      return;
+    }
 
     setRowBusy((prev) => ({ ...prev, [key]: true }));
     setRowError((prev) => {
@@ -205,6 +219,8 @@ export function RecommendationList() {
         {
           applyCPU: sel.cpu,
           applyMemory: sel.memory,
+          cpuLimit: sel.cpu ? limits.parsed.cpu?.spec : undefined,
+          memoryLimit: sel.memory ? limits.parsed.memory?.spec : undefined,
         },
       );
       setSelection((prev) => {
@@ -274,7 +290,8 @@ export function RecommendationList() {
     const entries = Object.entries(selection).filter(
       ([, sel]) => sel.cpu || sel.memory,
     );
-    if (entries.length === 0) return;
+    if (entries.length === 0 || !entries.every(([, sel]) => limitsValidFor(sel)))
+      return;
 
     setSummaryBusy(true);
     const failures: string[] = [];
@@ -289,6 +306,8 @@ export function RecommendationList() {
           {
             applyCPU: sel.cpu,
             applyMemory: sel.memory,
+            cpuLimit: sel.cpu ? limits.parsed.cpu?.spec : undefined,
+            memoryLimit: sel.memory ? limits.parsed.memory?.spec : undefined,
           },
         );
         setSelection((prev) => {
@@ -361,6 +380,7 @@ export function RecommendationList() {
           rows={selectedRows}
           busy={summaryBusy}
           error={summaryError}
+          limits={limits}
           onRemove={removeFromSelection}
           onClear={clearSelection}
           onApply={applySelection}
@@ -561,6 +581,7 @@ export function RecommendationList() {
         rows={selectedRows}
         busy={summaryBusy}
         error={summaryError}
+        limits={limits}
         onRemove={removeFromSelection}
         onClear={clearSelection}
         onApply={applySelection}

@@ -15,6 +15,9 @@ export function parseK8sQuantityBytes(raw: string): number | null {
   const trimmed = raw.trim()
   if (trimmed === '') return null
 
+  const exponent = trimmed.match(/^([+-]?[0-9]*\.?[0-9]+)[eE]([+-]?[0-9]+)$/)
+  if (exponent) return Number(exponent[1]) * Math.pow(10, Number(exponent[2]))
+
   const match = trimmed.match(/^([+-]?[0-9]*\.?[0-9]+)([a-zA-Z]*)$/)
   if (!match) return null
 

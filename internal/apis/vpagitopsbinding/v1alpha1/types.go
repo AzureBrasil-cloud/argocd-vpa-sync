@@ -84,6 +84,17 @@ type ContainerWriteBackConfig struct {
 	// +optional
 	MemoryKeyPath string `json:"memoryKeyPath,omitempty"`
 
+	// CPULimitKeyPath and MemoryLimitKeyPath locate the resources.limits
+	// value kept in step with the written request (the dashboard asks for a
+	// headroom percentage or an absolute value). They are never inferred
+	// from cpuKeyPath/memoryKeyPath: when omitted, write-back updates that
+	// resource's request only and leaves its limit untouched. A limit key
+	// that doesn't exist in the file is left absent, never created.
+	// +optional
+	CPULimitKeyPath string `json:"cpuLimitKeyPath,omitempty"`
+	// +optional
+	MemoryLimitKeyPath string `json:"memoryLimitKeyPath,omitempty"`
+
 	// MinChangePercent overrides VpaGitOpsBindingSpec.MinChangePercent for
 	// this container only.
 	// +optional

@@ -65,6 +65,8 @@ type PendingSelection struct {
 	RecommendationSummary ResourceAmount  `json:"recommendationSummary"`
 	OverrideCPU           *ResourceAmount `json:"overrideCPU,omitempty"`
 	OverrideMemory        *ResourceAmount `json:"overrideMemory,omitempty"`
+	CPULimit              *LimitSpec      `json:"cpuLimit,omitempty"`
+	MemoryLimit           *LimitSpec      `json:"memoryLimit,omitempty"`
 	CommitMessage         string          `json:"commitMessage,omitempty"`
 }
 

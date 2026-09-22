@@ -92,6 +92,15 @@ spec:
                         of the two must be set. That cross-field rule cannot be expressed as a
                         single CRD marker, so it is enforced defensively at reconcile time.
                       type: string
+                    cpuLimitKeyPath:
+                      description: |-
+                        CPULimitKeyPath and MemoryLimitKeyPath locate the resources.limits
+                        value kept in step with the written request (the dashboard asks for a
+                        headroom percentage or an absolute value). They are never inferred
+                        from cpuKeyPath/memoryKeyPath: when omitted, write-back updates that
+                        resource's request only and leaves its limit untouched. A limit key
+                        that doesn't exist in the file is left absent, never created.
+                      type: string
                     manifestPath:
                       minLength: 1
                       type: string
@@ -107,6 +116,8 @@ spec:
                       - yaml
                       type: string
                     memoryKeyPath:
+                      type: string
+                    memoryLimitKeyPath:
                       type: string
                     minChangePercent:
                       description: |-

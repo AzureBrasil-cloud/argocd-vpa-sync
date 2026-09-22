@@ -157,6 +157,9 @@ spec:
       manifestPath: apps/payments/values-prd.yaml
       cpuKeyPath: resources.requests.cpu
       memoryKeyPath: resources.requests.memory
+      # never inferred -- omit to leave that limit untouched
+      cpuLimitKeyPath: resources.limits.cpu
+      memoryLimitKeyPath: resources.limits.memory
 ```
 
 `containers` is a list, so one binding can configure write-back for more
@@ -165,6 +168,31 @@ support indexing into a container list by name, e.g.
 `spec.template.spec.containers[app].resources.requests.cpu` for a plain
 Deployment manifest; a Helm values file typically uses a plain dotted path
 like `resources.requests.cpu`.
+
+### Limits
+
+When a container declares `cpuLimitKeyPath` / `memoryLimitKeyPath`,
+write-back also rewrites that limit, so a new request can never exceed the
+limit already in Git (which Kubernetes rejects with `requests: Invalid
+value: ... must be less than or equal to memory limit`). The dashboard lets
+you choose, per resource, how the limit is set:
+
+- **Headroom %** (default 20%): the new request becomes `(100 - headroom)%`
+  of the limit, i.e. `limit = request / (1 - headroom/100)`, rounded up.
+  A 305Mi request at 20% gets `305Mi / 0.8 = 381.25Mi -> 382Mi`. Must be
+  `>= 0` and `< 100`.
+- **Absolute value**: the limit is written exactly as given, in any
+  Kubernetes quantity valid for the resource (memory: `512Mi`, `1Gi`,
+  `1.5G`...; CPU: `500m`, `0.5`, `2`). It must not be below the new request.
+
+Notes:
+
+- The limit is always recalculated, so it can go **down** as well as up;
+  the summary flags every limit that will be lowered.
+- Limit key paths are **never inferred** from the request key paths (a Helm
+  values layout can put the limit anywhere). Without them, only the request
+  is written and the dashboard shows a warning.
+- A limit the file doesn't declare is left absent, never added.
 
 `status.conditions[type=Ready]` reports validation problems (missing
 required field, unknown enum value, the referenced VPA not found, or
@@ -180,6 +208,22 @@ namespace, matching the same labels Argo CD itself uses
 (`argocd.argoproj.io/secret-type: repository|repo-creds`). See
 `internal/credentials/argocd_secret_provider.go`.
 
+For SSH-authenticated repositories, host key verification is always strict
+(`StrictHostKeyChecking=yes`) — there is no insecure fallback. The known_hosts
+data comes from either the matched Secret's `sshKnownHosts` field, or, since
+that field is rarely populated on Argo CD's own repo Secrets, from Argo CD's
+central `argocd-ssh-known-hosts-cm` ConfigMap (mounted as `optional: true`, so
+its absence never blocks the pod from starting), pointed at via
+`SSH_KNOWN_HOSTS` (see `deploy/manifests/06-deployment.yaml` and
+`internal/gitexec/runner.go`). This mirrors the same ConfigMap/mount
+convention as the upstream `argocd-image-updater` Helm chart, which is why
+that controller has never needed extra known_hosts configuration here either.
+A host missing from both — e.g. a
+`git ls-remote`/writeback failing with `Host key verification failed` for a
+host Argo CD itself syncs fine — means that ConfigMap needs the host's key
+added on the Argo CD side (`argocd cert add-ssh --batch` or Argo CD's
+Settings → Certificates UI).
+
 ## RBAC
 
 See `deploy/manifests/` for the exact manifests. Summary:
@@ -192,7 +236,7 @@ See `deploy/manifests/` for the exact manifests. Summary:
 | cluster | `argocd-vpa-updater.argoproj.io/vpagitopsbindings/status` | get, update, patch |
 | cluster | `apps/deployments`, `apps/statefulsets` | get |
 | cluster | `batch/cronjobs` | get |
-| `argocd-vpa-updater` namespace | `secrets/argocd-vpa-updater-state` (by name) | get, update |
+| `argocd` namespace | `secrets/argocd-vpa-updater-state` (by name) | get, update |
 | `argocd` namespace | `secrets` | get, list, watch |
 
 The Deployment/StatefulSet/CronJob grant is `get` only, never `list`/`watch`:
@@ -242,14 +286,9 @@ without partially writing anything.
 kubectl apply -k deploy/manifests
 ```
 
-This creates the `VpaGitOpsBinding` CRD, the `argocd-vpa-updater` namespace,
-ServiceAccount, RBAC, a bootstrapped (empty) state Secret, and the
-Deployment/Service. It assumes Argo CD itself lives in the `argocd`
-namespace (override via the `ARGOCD_NAMESPACE` env var on the Deployment if
-not).
-
-`deploy/manifests/overlays/argocd-namespace-test/` is a temporary variant
-that installs everything into the `argocd` namespace instead (used for
-early smoke-testing where reusing that namespace was convenient); prefer
-the base manifests above once the project is onboarded as a proper Argo CD
-Application.
+This creates the `VpaGitOpsBinding` CRD, the ServiceAccount, RBAC, a
+bootstrapped (empty) state Secret, and the Deployment/Service, all in the
+`argocd` namespace — this controller is deployed alongside Argo CD itself
+rather than into a namespace of its own (override via the
+`ARGOCD_NAMESPACE`/`STATE_SECRET_NAMESPACE` env vars on the Deployment if
+Argo CD lives elsewhere).

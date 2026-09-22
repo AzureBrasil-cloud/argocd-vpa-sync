@@ -295,6 +295,9 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 			OverrideCPU:    item.OverrideCPU,
 			OverrideMemory: item.OverrideMemory,
 			IdempotencyKey: item.IdempotencyKey,
+
+			CPULimit:    item.CPULimit,
+			MemoryLimit: item.MemoryLimit,
 		}
 		newContent, patchResult, err := item.Patcher.Patch(ctx, originalContent, patchReq)
 		if err != nil {

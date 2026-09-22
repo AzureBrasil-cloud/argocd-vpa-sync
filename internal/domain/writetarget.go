@@ -7,12 +7,20 @@ import "k8s.io/apimachinery/pkg/api/resource"
 // by a GitOpsTargetResolver from a NormalizedVPA + container name, and
 // consumed by a ManifestPatcher and a GitWriteBackService.
 type WriteTarget struct {
-	RepoURL         string
-	Branch          string
-	FilePath        string
-	SourceType      SourceType
-	CPUKeyPath      string
-	MemoryKeyPath   string
+	RepoURL       string
+	Branch        string
+	FilePath      string
+	SourceType    SourceType
+	CPUKeyPath    string
+	MemoryKeyPath string
+
+	// CPULimitKeyPath / MemoryLimitKeyPath locate the matching
+	// resources.limits value, so write-back can keep the limit in step with
+	// a new request (see PatchRequest.CPULimit/MemoryLimit). Either is empty
+	// when the binding doesn't declare it.
+	CPULimitKeyPath    string
+	MemoryLimitKeyPath string
+
 	WriteBackPolicy WriteBackPolicy
 	Workload        WorkloadRef
 	ContainerName   string
@@ -41,6 +49,13 @@ type PatchRequest struct {
 	// value before commit).
 	OverrideCPU    *ResourceAmount
 	OverrideMemory *ResourceAmount
+
+	// CPULimit / MemoryLimit, when non-nil, make the patcher also rewrite
+	// that resource's limit (only when the resource itself is applied), by
+	// headroom or to an absolute value (see LimitSpec). Nil leaves the limit
+	// untouched.
+	CPULimit    *LimitSpec
+	MemoryLimit *LimitSpec
 
 	IdempotencyKey string
 }

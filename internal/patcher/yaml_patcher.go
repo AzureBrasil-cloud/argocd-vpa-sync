@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -78,6 +79,12 @@ func (p keyPathPatcher) Patch(_ context.Context, fileContent []byte, req domain.
 			return nil, domain.PatchResult{}, err
 		}
 		changed = changed || c
+
+		c, err = syncLimit(root, req.Target.CPUKeyPath, req.Target.CPULimitKeyPath, req.CPULimit, true)
+		if err != nil {
+			return nil, domain.PatchResult{}, err
+		}
+		changed = changed || c
 	}
 
 	if req.ApplyMemory && req.Target.MemoryKeyPath != "" {
@@ -86,6 +93,12 @@ func (p keyPathPatcher) Patch(_ context.Context, fileContent []byte, req domain.
 			return nil, domain.PatchResult{}, fmt.Errorf("patcher: ApplyMemory is set but no memory value is available to apply")
 		}
 		c, err := setQuantity(root, req.Target.MemoryKeyPath, *desired)
+		if err != nil {
+			return nil, domain.PatchResult{}, err
+		}
+		changed = changed || c
+
+		c, err = syncLimit(root, req.Target.MemoryKeyPath, req.Target.MemoryLimitKeyPath, req.MemoryLimit, false)
 		if err != nil {
 			return nil, domain.PatchResult{}, err
 		}
@@ -150,18 +163,35 @@ func lookupNode(root *kyaml.RNode, rawPath string) (*kyaml.RNode, error) {
 // holds a numerically equal value, so callers can treat that as a no-op
 // rather than a write.
 func setQuantity(root *kyaml.RNode, rawPath string, q resource.Quantity) (bool, error) {
+	return setQuantityRounded(root, rawPath, q, false)
+}
+
+// setQuantityRounded is setQuantity with a choice of rounding when q has to
+// be expressed in a coarser unit than it carries: nearest (roundUp=false,
+// right for a request) or up (roundUp=true, right for a limit, which must
+// never land below the request it was computed from).
+func setQuantityRounded(root *kyaml.RNode, rawPath string, q resource.Quantity, roundUp bool) (bool, error) {
+	return setQuantityFormatted(root, rawPath, func(existingRaw string) string {
+		return formatLikeExistingRounded(existingRaw, q, roundUp)
+	})
+}
+
+// setQuantityFormatted sets the scalar at rawPath to format(existingRaw);
+// a no-op when that's numerically what's already there.
+func setQuantityFormatted(root *kyaml.RNode, rawPath string, format func(existingRaw string) string) (bool, error) {
 	node, err := lookupNode(root, rawPath)
 	if err != nil {
 		return false, err
 	}
 
 	existingRaw := node.YNode().Value
+	newRaw := format(existingRaw)
 	current, err := resource.ParseQuantity(existingRaw)
-	if err == nil && current.MilliValue() == q.MilliValue() {
+	if written, werr := resource.ParseQuantity(newRaw); err == nil && werr == nil && current.MilliValue() == written.MilliValue() {
 		return false, nil
 	}
 
-	node.YNode().Value = formatLikeExisting(existingRaw, q)
+	node.YNode().Value = newRaw
 	// The node's Tag was resolved from the OLD value (e.g. "!!int" for a
 	// plain "1"); left in place, a new value of a different implicit kind
 	// (e.g. "0.7", a float) would force the encoder to emit an incorrect
@@ -170,4 +200,38 @@ func setQuantity(root *kyaml.RNode, rawPath string, q resource.Quantity) (bool, 
 	// as if a human had hand-written it.
 	node.YNode().Tag = ""
 	return true, nil
+}
+
+// syncLimit rewrites the limit at limitPath per spec (see domain.LimitSpec):
+// by headroom, derived from the request as it was actually written -- after
+// rounding to the file's unit -- so the two can never disagree the way
+// Kubernetes rejects (request > limit), even when the request and limit use
+// different units; or to an absolute value, written as given, which is an
+// error if it's below that request. It is a no-op when spec is nil (limit
+// left alone) or limitPath is empty, and also when the limit key doesn't
+// exist in the file: a container without a limit is already valid, and a
+// limit is never created.
+func syncLimit(root *kyaml.RNode, requestPath, limitPath string, spec *domain.LimitSpec, isCPU bool) (bool, error) {
+	if spec == nil || limitPath == "" {
+		return false, nil
+	}
+	if _, err := lookupNode(root, limitPath); err != nil {
+		if errors.Is(err, ErrKeyPathNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	request, err := lookupQuantity(root, requestPath)
+	if err != nil {
+		return false, err
+	}
+	limit, err := spec.Limit(*request, isCPU)
+	if err != nil {
+		return false, fmt.Errorf("patcher: %s: %w", limitPath, err)
+	}
+	if spec.Value != nil {
+		return setQuantityFormatted(root, limitPath, func(string) string { return limit.String() })
+	}
+	return setQuantityRounded(root, limitPath, limit, true)
 }

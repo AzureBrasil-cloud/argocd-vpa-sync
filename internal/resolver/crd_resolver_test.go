@@ -23,6 +23,9 @@ func validVPA() domain.NormalizedVPA {
 				ManifestPath:  "apps/payments/values-prd.yaml",
 				CPUKeyPath:    "resources.requests.cpu",
 				MemoryKeyPath: "resources.requests.memory",
+
+				CPULimitKeyPath:    "resources.limits.cpu",
+				MemoryLimitKeyPath: "resources.limits.memory",
 			},
 		},
 	}
@@ -149,5 +152,37 @@ func TestResolve_ArgoCDLookupError_ProducesWarningNotError(t *testing.T) {
 	}
 	if len(target.Warnings) != 1 {
 		t.Fatalf("expected exactly one warning, got %v", target.Warnings)
+	}
+}
+
+func TestResolve_LimitKeyPathsAreNotInferred(t *testing.T) {
+	vpa := validVPA()
+	vpa.Binding.Containers[0].CPULimitKeyPath = ""
+	vpa.Binding.Containers[0].MemoryLimitKeyPath = ""
+	target, err := NewCRDResolver(nil, "argocd").Resolve(context.Background(), vpa, "app")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if target.CPULimitKeyPath != "" || target.MemoryLimitKeyPath != "" {
+		t.Fatalf("expected no limit key paths, got %+v", target)
+	}
+	if len(target.Warnings) != 2 {
+		t.Fatalf("expected a warning per resource without a limit key path, got %v", target.Warnings)
+	}
+}
+
+func TestResolve_DeclaredLimitKeyPaths(t *testing.T) {
+	vpa := validVPA()
+	vpa.Binding.Containers[0].CPULimitKeyPath = "resources.limits.cpu"
+	vpa.Binding.Containers[0].MemoryLimitKeyPath = "app.memoryLimit"
+	target, err := NewCRDResolver(nil, "argocd").Resolve(context.Background(), vpa, "app")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if target.CPULimitKeyPath != "resources.limits.cpu" || target.MemoryLimitKeyPath != "app.memoryLimit" {
+		t.Fatalf("unexpected limit key paths: %+v", target)
+	}
+	if len(target.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", target.Warnings)
 	}
 }

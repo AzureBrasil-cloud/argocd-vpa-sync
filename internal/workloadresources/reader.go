@@ -1,4 +1,4 @@
-// Package workloadresources reads the resources.requests currently declared
+// Package workloadresources reads the resources.requests/limits currently declared
 // for one container of the live Kubernetes workload a VPA targets --
 // straight from the Deployment/StatefulSet/CronJob object on the API
 // server, not from Git. The dashboard needs a "current value" to diff
@@ -34,10 +34,16 @@ var ErrUnsupportedKind = errors.New("workloadresources: unsupported workload kin
 // has no container with the requested name.
 var ErrContainerNotFound = errors.New("workloadresources: container not found in live workload")
 
-// Reader reads the current resources.requests for one container of a live
-// workload.
+// Values is what one container of a live workload currently declares.
+type Values struct {
+	Requests domain.ResourceAmount
+	Limits   domain.ResourceAmount
+}
+
+// Reader reads the current resources.requests and resources.limits for one
+// container of a live workload.
 type Reader interface {
-	CurrentValues(ctx context.Context, workload domain.WorkloadRef, containerName string) (domain.ResourceAmount, error)
+	CurrentValues(ctx context.Context, workload domain.WorkloadRef, containerName string) (Values, error)
 }
 
 // ClusterReader is the default Reader, backed by a Kubernetes client.
@@ -51,17 +57,20 @@ func NewClusterReader(c client.Client) *ClusterReader {
 }
 
 // CurrentValues implements Reader.
-func (r *ClusterReader) CurrentValues(ctx context.Context, workload domain.WorkloadRef, containerName string) (domain.ResourceAmount, error) {
+func (r *ClusterReader) CurrentValues(ctx context.Context, workload domain.WorkloadRef, containerName string) (Values, error) {
 	containers, err := r.podSpecContainers(ctx, workload)
 	if err != nil {
-		return domain.ResourceAmount{}, err
+		return Values{}, err
 	}
 	for _, c := range containers {
 		if c.Name == containerName {
-			return toResourceAmount(c.Resources.Requests), nil
+			return Values{
+				Requests: toResourceAmount(c.Resources.Requests),
+				Limits:   toResourceAmount(c.Resources.Limits),
+			}, nil
 		}
 	}
-	return domain.ResourceAmount{}, fmt.Errorf("%w: %s/%s container %q", ErrContainerNotFound, workload.Namespace, workload.Name, containerName)
+	return Values{}, fmt.Errorf("%w: %s/%s container %q", ErrContainerNotFound, workload.Namespace, workload.Name, containerName)
 }
 
 func (r *ClusterReader) podSpecContainers(ctx context.Context, workload domain.WorkloadRef) ([]corev1.Container, error) {

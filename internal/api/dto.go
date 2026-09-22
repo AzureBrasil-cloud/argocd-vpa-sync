@@ -1,7 +1,10 @@
 package api
 
 import (
+	"fmt"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/azurebrasil/argocd-vpa-updater/internal/domain"
 )
@@ -34,6 +37,15 @@ type RecommendationDTO struct {
 
 	CurrentCPU    string `json:"currentCpu,omitempty"`
 	CurrentMemory string `json:"currentMemory,omitempty"`
+
+	// CurrentCPULimit/CurrentMemoryLimit are the live workload's limits
+	// (empty when it declares none). CPULimitConfigured/
+	// MemoryLimitConfigured say whether write-back has a limit key path to
+	// keep in step with the request.
+	CurrentCPULimit       string `json:"currentCpuLimit,omitempty"`
+	CurrentMemoryLimit    string `json:"currentMemoryLimit,omitempty"`
+	CPULimitConfigured    bool   `json:"cpuLimitConfigured"`
+	MemoryLimitConfigured bool   `json:"memoryLimitConfigured"`
 
 	DeltaCPUAbsoluteMilli    int64    `json:"deltaCpuAbsoluteMilli,omitempty"`
 	DeltaCPUPercent          *float64 `json:"deltaCpuPercent,omitempty"`
@@ -102,6 +114,47 @@ type ListRecommendationsResponse struct {
 type SelectRequest struct {
 	ApplyCPU    bool `json:"applyCPU"`
 	ApplyMemory bool `json:"applyMemory"`
+
+	// CPULimit / MemoryLimit, when set, also rewrite that resource's limit
+	// (only if the resource itself is applied). Omitted leaves it untouched.
+	CPULimit    *LimitSpecDTO `json:"cpuLimit,omitempty"`
+	MemoryLimit *LimitSpecDTO `json:"memoryLimit,omitempty"`
+}
+
+// LimitSpecDTO is the wire form of domain.LimitSpec: exactly one of
+// HeadroomPercent (the new request becomes (100-p)% of the limit, p in
+// [0, 100)) or Value (an absolute Kubernetes quantity, e.g. "512Mi" or
+// "500m").
+type LimitSpecDTO struct {
+	HeadroomPercent *float64 `json:"headroomPercent,omitempty"`
+	Value           string   `json:"value,omitempty"`
+}
+
+func (d *LimitSpecDTO) toDomain() (*domain.LimitSpec, error) {
+	if d == nil {
+		return nil, nil
+	}
+	spec := &domain.LimitSpec{HeadroomPercent: d.HeadroomPercent}
+	if d.Value != "" {
+		q, err := resource.ParseQuantity(d.Value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid quantity %q: %w", d.Value, err)
+		}
+		spec.Value = &q
+	}
+	return spec, nil
+}
+
+func (r SelectRequest) options() (SelectOptions, error) {
+	cpu, err := r.CPULimit.toDomain()
+	if err != nil {
+		return SelectOptions{}, fmt.Errorf("%w: cpu limit: %v", ErrInvalidSelectRequest, err)
+	}
+	memory, err := r.MemoryLimit.toDomain()
+	if err != nil {
+		return SelectOptions{}, fmt.Errorf("%w: memory limit: %v", ErrInvalidSelectRequest, err)
+	}
+	return SelectOptions{ApplyCPU: r.ApplyCPU, ApplyMemory: r.ApplyMemory, CPULimit: cpu, MemoryLimit: memory}, nil
 }
 
 // SkippedSelectionDTO explains why one container was skipped by a bulk

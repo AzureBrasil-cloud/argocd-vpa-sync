@@ -33,6 +33,16 @@ func Key(vpaNamespace, vpaName string, target domain.WriteTarget, req domain.Pat
 	fmt.Fprintf(h, "sourceType=%s\n", target.SourceType)
 	fmt.Fprintf(h, "cpuKeyPath=%s\n", target.CPUKeyPath)
 	fmt.Fprintf(h, "memoryKeyPath=%s\n", target.MemoryKeyPath)
+	// Only mixed in when set, so keys for selections that leave limits alone
+	// stay identical to the ones computed before limits existed.
+	if req.CPULimit != nil {
+		fmt.Fprintf(h, "cpuLimitKeyPath=%s\n", target.CPULimitKeyPath)
+		fmt.Fprintf(h, "cpuLimit=%s\n", req.CPULimit.String())
+	}
+	if req.MemoryLimit != nil {
+		fmt.Fprintf(h, "memoryLimitKeyPath=%s\n", target.MemoryLimitKeyPath)
+		fmt.Fprintf(h, "memoryLimit=%s\n", req.MemoryLimit.String())
+	}
 	fmt.Fprintf(h, "applyCPU=%v\n", req.ApplyCPU)
 	fmt.Fprintf(h, "applyMemory=%v\n", req.ApplyMemory)
 	fmt.Fprintf(h, "cpu=%s\n", quantityString(req.EffectiveCPU()))

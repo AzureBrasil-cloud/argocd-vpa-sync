@@ -63,7 +63,12 @@ func (r *CRDResolver) Resolve(ctx context.Context, vpa domain.NormalizedVPA, con
 		WriteBackPolicy: vpa.Binding.WriteBackPolicy,
 		Workload:        vpa.Workload,
 		ContainerName:   containerName,
+
+		CPULimitKeyPath:    cc.CPULimitKeyPath,
+		MemoryLimitKeyPath: cc.MemoryLimitKeyPath,
 	}
+	warnMissingLimitKeyPath(&target, "cpu", cc.CPUKeyPath, cc.CPULimitKeyPath)
+	warnMissingLimitKeyPath(&target, "memory", cc.MemoryKeyPath, cc.MemoryLimitKeyPath)
 
 	if r.ArgoCDApps != nil && vpa.Binding.ArgoCDApplication != "" {
 		ns := vpa.Binding.ArgoCDApplicationNamespace
@@ -79,6 +84,18 @@ func (r *CRDResolver) Resolve(ctx context.Context, vpa domain.NormalizedVPA, con
 	}
 
 	return target, nil
+}
+
+// warnMissingLimitKeyPath records a warning when a resource's request is
+// written back but its limit key path isn't declared. Limit key paths are
+// never inferred -- a Helm values layout can put the limit anywhere -- so
+// write-back will update the request alone, which Kubernetes rejects if
+// the new request exceeds the limit already in the file.
+func warnMissingLimitKeyPath(target *domain.WriteTarget, resourceName, requestKeyPath, limitKeyPath string) {
+	if requestKeyPath == "" || limitKeyPath != "" {
+		return
+	}
+	target.Warnings = append(target.Warnings, fmt.Sprintf("%sLimitKeyPath is not set: write-back updates the %s request only and leaves its limit untouched", resourceName, resourceName))
 }
 
 func contains(list []string, s string) bool {

@@ -646,3 +646,93 @@ table {
   font-size: 13px;
   padding: 8px 10px;
 }
+
+.limit-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.limit-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.limit-settings-label {
+  min-width: 96px;
+}
+
+.limit-settings-row select,
+.limit-settings-row input {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+}
+
+.limit-settings-percent {
+  width: 56px;
+}
+
+.limit-settings-value {
+  width: 96px;
+}
+
+.limit-settings-row input[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.limit-settings-info {
+  cursor: help;
+  color: var(--muted);
+}
+
+.limit-settings-error {
+  flex-basis: 100%;
+  color: var(--error);
+  font-size: 12px;
+}
+
+.selection-summary-blocker {
+  font-size: 13px;
+  color: var(--error);
+}
+
+.badge-error {
+  background: color-mix(in srgb, var(--error) 15%, transparent);
+  color: var(--error);
+}
+
+.limit-below-request {
+  color: var(--error);
+  font-weight: 500;
+}
+
+.selection-summary-warning {
+  font-size: 13px;
+  color: var(--warning);
+}
+
+.selection-summary-resource {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.selection-summary .selection-summary-item-values {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.limit-decreases {
+  color: var(--increase);
+  font-weight: 500;
+}

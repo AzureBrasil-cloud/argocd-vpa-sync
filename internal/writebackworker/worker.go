@@ -284,7 +284,10 @@ func (w *Worker) applyBatch(ctx context.Context, svc gitwriteback.BatchGitWriteB
 			OverrideCPU:    sel.OverrideCPU,
 			OverrideMemory: sel.OverrideMemory,
 			IdempotencyKey: sel.IdempotencyKey,
-			Patcher:        p,
+
+			CPULimit:    sel.CPULimit,
+			MemoryLimit: sel.MemoryLimit,
+			Patcher:     p,
 		})
 	}
 
@@ -397,6 +400,9 @@ func (w *Worker) doApply(ctx context.Context, sel domain.PendingSelection) (gitw
 			OverrideCPU:    sel.OverrideCPU,
 			OverrideMemory: sel.OverrideMemory,
 			IdempotencyKey: sel.IdempotencyKey,
+
+			CPULimit:    sel.CPULimit,
+			MemoryLimit: sel.MemoryLimit,
 		},
 		CommitMessage: sel.CommitMessage,
 		Credentials:   creds,

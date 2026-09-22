@@ -160,12 +160,14 @@ func toDomainSpec(s gitopsv1alpha1.VpaGitOpsBindingSpec) domain.GitOpsBindingSpe
 	out.Containers = make([]domain.ContainerWriteBackConfig, 0, len(s.Containers))
 	for _, c := range s.Containers {
 		out.Containers = append(out.Containers, domain.ContainerWriteBackConfig{
-			ContainerName:    c.Name,
-			ManifestType:     domain.SourceType(c.ManifestType),
-			ManifestPath:     c.ManifestPath,
-			CPUKeyPath:       c.CPUKeyPath,
-			MemoryKeyPath:    c.MemoryKeyPath,
-			MinChangePercent: c.MinChangePercent,
+			ContainerName:      c.Name,
+			ManifestType:       domain.SourceType(c.ManifestType),
+			ManifestPath:       c.ManifestPath,
+			CPUKeyPath:         c.CPUKeyPath,
+			MemoryKeyPath:      c.MemoryKeyPath,
+			CPULimitKeyPath:    c.CPULimitKeyPath,
+			MemoryLimitKeyPath: c.MemoryLimitKeyPath,
+			MinChangePercent:   c.MinChangePercent,
 		})
 	}
 	return out

@@ -57,11 +57,13 @@ func sampleVPA() domain.NormalizedVPA {
 			MinChangePercent:  10,
 			Containers: []domain.ContainerWriteBackConfig{
 				{
-					ContainerName: "app",
-					ManifestType:  domain.SourceTypeYAML,
-					ManifestPath:  "deploy/checkout-api.yaml",
-					CPUKeyPath:    "spec.template.spec.containers[app].resources.requests.cpu",
-					MemoryKeyPath: "spec.template.spec.containers[app].resources.requests.memory",
+					ContainerName:      "app",
+					ManifestType:       domain.SourceTypeYAML,
+					ManifestPath:       "deploy/checkout-api.yaml",
+					CPUKeyPath:         "spec.template.spec.containers[app].resources.requests.cpu",
+					MemoryKeyPath:      "spec.template.spec.containers[app].resources.requests.memory",
+					CPULimitKeyPath:    "spec.template.spec.containers[app].resources.limits.cpu",
+					MemoryLimitKeyPath: "spec.template.spec.containers[app].resources.limits.memory",
 				},
 			},
 		},
@@ -288,7 +290,7 @@ func TestGetRecommendation_NotFound(t *testing.T) {
 func TestSelectRecommendation_Success(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	sel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, true)
+	sel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,7 +320,7 @@ func TestSelectRecommendation_NotEligible(t *testing.T) {
 
 	svc := newTestService(t, []domain.NormalizedVPA{vpa})
 
-	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, true)
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if !errors.Is(err, ErrRecommendationNotEligible) {
 		t.Fatalf("expected ErrRecommendationNotEligible, got %v", err)
 	}
@@ -327,7 +329,7 @@ func TestSelectRecommendation_NotEligible(t *testing.T) {
 func TestSelectRecommendation_NotFound(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "sidecar", true, true)
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "sidecar", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if !errors.Is(err, ErrRecommendationNotFound) {
 		t.Fatalf("expected ErrRecommendationNotFound, got %v", err)
 	}
@@ -336,11 +338,11 @@ func TestSelectRecommendation_NotFound(t *testing.T) {
 func TestSelectRecommendation_ReplacesRatherThanDuplicates(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	first, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, true)
+	first, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	second, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, true)
+	second, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -366,11 +368,11 @@ func TestSelectRecommendation_ReplacesRatherThanDuplicates(t *testing.T) {
 func TestSelectRecommendation_PartialResourceSelectionChangesIdempotencyKey(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	cpuOnly, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, false)
+	cpuOnly, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	both, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", true, true)
+	both, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -385,7 +387,7 @@ func TestSelectRecommendation_RequestedResourceNotConfigured(t *testing.T) {
 
 	svc := newTestService(t, []domain.NormalizedVPA{vpa})
 
-	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", false, true)
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: false, ApplyMemory: true})
 	if !errors.Is(err, ErrRecommendationNotEligible) {
 		t.Fatalf("expected ErrRecommendationNotEligible for an unconfigured resource, got %v", err)
 	}
@@ -394,7 +396,7 @@ func TestSelectRecommendation_RequestedResourceNotConfigured(t *testing.T) {
 func TestSelectRecommendation_NoResourceRequested(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", false, false)
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: false, ApplyMemory: false})
 	if !errors.Is(err, ErrRecommendationNotEligible) {
 		t.Fatalf("expected ErrRecommendationNotEligible when neither resource is requested, got %v", err)
 	}
@@ -434,7 +436,7 @@ func cpuOnlyIneligibleVPA() domain.NormalizedVPA {
 func TestBulkSelectRecommendations_MixedEligibility(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA(), cpuOnlyIneligibleVPA()})
 
-	result, err := svc.BulkSelectRecommendations(context.Background(), true, true)
+	result, err := svc.BulkSelectRecommendations(context.Background(), SelectOptions{ApplyCPU: true, ApplyMemory: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -460,7 +462,7 @@ func TestBulkSelectRecommendations_CPUOnly_SkipsContainersWithoutCPU(t *testing.
 
 	svc := newTestService(t, []domain.NormalizedVPA{vpa})
 
-	result, err := svc.BulkSelectRecommendations(context.Background(), true, false)
+	result, err := svc.BulkSelectRecommendations(context.Background(), SelectOptions{ApplyCPU: true, ApplyMemory: false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -475,7 +477,7 @@ func TestBulkSelectRecommendations_CPUOnly_SkipsContainersWithoutCPU(t *testing.
 func TestBulkSelectRecommendations_NoResourceRequested(t *testing.T) {
 	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
 
-	_, err := svc.BulkSelectRecommendations(context.Background(), false, false)
+	_, err := svc.BulkSelectRecommendations(context.Background(), SelectOptions{ApplyCPU: false, ApplyMemory: false})
 	if !errors.Is(err, ErrRecommendationNotEligible) {
 		t.Fatalf("expected ErrRecommendationNotEligible when neither resource is requested, got %v", err)
 	}
@@ -486,3 +488,92 @@ var errWorkloadNotFound = &testError{"workload not found"}
 type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }
+
+func TestSelectRecommendation_CarriesLimitSpecs(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	pct := 20.0
+	value := resource.MustParse("1Gi")
+
+	withLimits, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{
+		ApplyCPU:    true,
+		ApplyMemory: true,
+		CPULimit:    &domain.LimitSpec{HeadroomPercent: &pct},
+		MemoryLimit: &domain.LimitSpec{Value: &value},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if withLimits.CPULimit == nil || *withLimits.CPULimit.HeadroomPercent != 20 {
+		t.Fatalf("expected cpu limit headroom 20 on the selection, got %+v", withLimits.CPULimit)
+	}
+	if withLimits.MemoryLimit == nil || withLimits.MemoryLimit.Value.String() != "1Gi" {
+		t.Fatalf("expected memory limit 1Gi on the selection, got %+v", withLimits.MemoryLimit)
+	}
+	if withLimits.Target.MemoryLimitKeyPath != "spec.template.spec.containers[app].resources.limits.memory" {
+		t.Fatalf("expected derived memory limit key path, got %q", withLimits.Target.MemoryLimitKeyPath)
+	}
+
+	without, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, ApplyMemory: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if without.IdempotencyKey == withLimits.IdempotencyKey {
+		t.Fatalf("expected the limit specs to change the idempotency key")
+	}
+}
+
+func TestSelectRecommendation_DropsLimitSpecOfUnappliedResource(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	pct := 20.0
+	sel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{
+		ApplyCPU:    true,
+		MemoryLimit: &domain.LimitSpec{HeadroomPercent: &pct},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sel.MemoryLimit != nil {
+		t.Fatalf("expected no memory limit spec when memory isn't applied, got %+v", sel.MemoryLimit)
+	}
+}
+
+func TestSelectRecommendation_RejectsInvalidLimitSpecs(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	pct := 100.0
+	below := resource.MustParse("256Mi") // recommendation is 512Mi
+	for name, opts := range map[string]SelectOptions{
+		"headroom 100":        {ApplyCPU: true, CPULimit: &domain.LimitSpec{HeadroomPercent: &pct}},
+		"value below request": {ApplyMemory: true, MemoryLimit: &domain.LimitSpec{Value: &below}},
+	} {
+		_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", opts)
+		if !errors.Is(err, ErrInvalidSelectRequest) {
+			t.Errorf("%s: expected ErrInvalidSelectRequest, got %v", name, err)
+		}
+	}
+}
+
+func TestSelectRequest_OptionsParsesQuantities(t *testing.T) {
+	if _, err := (SelectRequest{ApplyMemory: true, MemoryLimit: &LimitSpecDTO{Value: "512Mb"}}).options(); !errors.Is(err, ErrInvalidSelectRequest) {
+		t.Fatalf("expected ErrInvalidSelectRequest for an invalid quantity, got %v", err)
+	}
+	opts, err := (SelectRequest{ApplyMemory: true, MemoryLimit: &LimitSpecDTO{Value: "512Mi"}}).options()
+	if err != nil || opts.MemoryLimit == nil || opts.MemoryLimit.Value.String() != "512Mi" {
+		t.Fatalf("unexpected result: %+v, %v", opts.MemoryLimit, err)
+	}
+}
+
+func TestListRecommendations_ExposesLiveLimits(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	svc.WorkloadReader = workloadresources.FakeReader{
+		ByContainer:       defaultWorkloadValues(),
+		LimitsByContainer: map[string]domain.ResourceAmount{"app": {CPU: qptr("500m"), Memory: qptr("300Mi")}},
+	}
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	it := items[0]
+	if it.CurrentCPULimit != "500m" || it.CurrentMemoryLimit != "300Mi" || !it.CPULimitConfigured || !it.MemoryLimitConfigured {
+		t.Fatalf("unexpected limit fields: %+v", it)
+	}
+}

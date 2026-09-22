@@ -47,4 +47,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: argocd-vpa-updater
-    namespace: argocd-vpa-updater
+    namespace: argocd

@@ -32,6 +32,13 @@ export interface RecommendationDTO {
   currentCpu?: string
   currentMemory?: string
 
+  // Live workload limits (absent when it declares none), and whether
+  // write-back has a limit key path to keep in step with the request.
+  currentCpuLimit?: string
+  currentMemoryLimit?: string
+  cpuLimitConfigured: boolean
+  memoryLimitConfigured: boolean
+
   deltaCpuAbsoluteMilli?: number
   deltaCpuPercent?: number
   deltaMemoryAbsoluteMilli?: number
@@ -93,5 +100,17 @@ export interface PendingSelectionDTO {
 export interface SelectRequest {
   applyCPU: boolean
   applyMemory: boolean
+  // When set, that resource's limit is rewritten too (only if the resource
+  // itself is applied). Omitted leaves it untouched.
+  cpuLimit?: LimitSpecRequest
+  memoryLimit?: LimitSpecRequest
+}
+
+// Mirrors api.LimitSpecDTO: exactly one of headroomPercent (the new request
+// becomes (100 - p)% of the limit, p in [0, 100)) or value (an absolute
+// Kubernetes quantity, e.g. "512Mi" or "500m").
+export interface LimitSpecRequest {
+  headroomPercent?: number
+  value?: string
 }
 

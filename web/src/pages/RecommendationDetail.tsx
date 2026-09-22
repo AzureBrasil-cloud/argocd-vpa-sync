@@ -3,9 +3,30 @@ import { Link, useParams } from 'react-router-dom'
 import { getRecommendation, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
+import { LimitSettingsInput } from '../components/LimitSettingsInput'
 import { ResourceCheckbox } from '../components/ResourceCheckbox'
 import { StatusBadge } from '../components/StatusBadge'
 import { formatCPU, formatMemory } from '../lib/format'
+import { limitChange, type LimitChange, type LimitResource } from '../lib/limits'
+import { useLimitSettings } from '../lib/useLimitSettings'
+
+function newLimitCell(change: LimitChange | null) {
+  if (!change) return '—'
+  if (change.next === null) return <span className="muted">{change.reason ?? '—'}</span>
+  if (change.belowRequest) {
+    return (
+      <span className="limit-below-request" title="Kubernetes rejects a request greater than its limit">
+        {change.next} &lt; request ✕
+      </span>
+    )
+  }
+  return (
+    <span className={change.decreases ? 'limit-decreases' : undefined} title={change.decreases ? 'The limit will be lowered' : undefined}>
+      {change.next}
+      {change.decreases && ' ⚠'}
+    </span>
+  )
+}
 
 export function RecommendationDetail() {
   const { namespace = '', vpaName = '', containerName = '' } = useParams()
@@ -15,6 +36,7 @@ export function RecommendationDetail() {
   const [selectMemory, setSelectMemory] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [selectError, setSelectError] = useState<string | null>(null)
+  const limits = useLimitSettings()
 
   const load = useCallback(() => {
     return getRecommendation(namespace, vpaName, containerName).then(setItem)
@@ -43,11 +65,16 @@ export function RecommendationDetail() {
   }, [hasInFlightWriteBack, load])
 
   async function handleAccept() {
-    if (!selectCPU && !selectMemory) return
+    if ((!selectCPU && !selectMemory) || limitBlocked) return
     setSelecting(true)
     setSelectError(null)
     try {
-      await selectRecommendation(namespace, vpaName, containerName, { applyCPU: selectCPU, applyMemory: selectMemory })
+      await selectRecommendation(namespace, vpaName, containerName, {
+        applyCPU: selectCPU,
+        applyMemory: selectMemory,
+        cpuLimit: selectCPU ? limits.parsed.cpu?.spec : undefined,
+        memoryLimit: selectMemory ? limits.parsed.memory?.spec : undefined,
+      })
       setSelectCPU(false)
       setSelectMemory(false)
       await load()
@@ -57,6 +84,15 @@ export function RecommendationDetail() {
       setSelecting(false)
     }
   }
+
+  const cpuChange = item && limits.parsed.cpu ? limitChange(item, 'cpu', limits.parsed.cpu) : null
+  const memoryChange = item && limits.parsed.memory ? limitChange(item, 'memory', limits.parsed.memory) : null
+  // Settings are shown for both resources so the preview columns are always
+  // filled in, but only a resource actually ticked must have a valid one.
+  const limitResources: LimitResource[] = ['cpu', 'memory']
+  const limitBlocked =
+    (selectCPU && (limits.parsed.cpu === null || cpuChange?.belowRequest === true)) ||
+    (selectMemory && (limits.parsed.memory === null || memoryChange?.belowRequest === true))
 
   return (
     <div>
@@ -130,6 +166,8 @@ export function RecommendationDetail() {
                 <th>Recommended (VPA)</th>
                 <th>Lower bound</th>
                 <th>Upper bound</th>
+                <th>Limit (live)</th>
+                <th>New limit</th>
               </tr>
             </thead>
             <tbody>
@@ -149,6 +187,8 @@ export function RecommendationDetail() {
                 <td>{formatCPU(item.recommendedCpu) || '—'}</td>
                 <td>{formatCPU(item.lowerBoundCpu) || '—'}</td>
                 <td>{formatCPU(item.upperBoundCpu) || '—'}</td>
+                <td>{formatCPU(item.currentCpuLimit) || '—'}</td>
+                <td>{newLimitCell(cpuChange)}</td>
               </tr>
               <tr>
                 <td>
@@ -166,6 +206,8 @@ export function RecommendationDetail() {
                 <td>{formatMemory(item.recommendedMemory) || '—'}</td>
                 <td>{formatMemory(item.lowerBoundMemory) || '—'}</td>
                 <td>{formatMemory(item.upperBoundMemory) || '—'}</td>
+                <td>{formatMemory(item.currentMemoryLimit) || '—'}</td>
+                <td>{newLimitCell(memoryChange)}</td>
               </tr>
             </tbody>
           </table>
@@ -177,10 +219,12 @@ export function RecommendationDetail() {
               <span className="badge badge-selected">✓ Queued for write-back</span>
             )}
 
+            <LimitSettingsInput settings={limits} resources={limitResources} disabled={selecting} />
+
             <button
               className="btn btn-primary"
               onClick={handleAccept}
-              disabled={selecting || (!selectCPU && !selectMemory)}
+              disabled={selecting || (!selectCPU && !selectMemory) || limitBlocked}
             >
               {selecting ? 'Queuing…' : 'Accept selected'}
             </button>
@@ -191,6 +235,9 @@ export function RecommendationDetail() {
           <p className="muted note">
             Tick CPU and/or memory above, then Accept to queue them for this project to write back
             to Git later -- nothing is modified in the VPA, the Deployment, or the cluster directly.
+            Each accepted resource's limit is rewritten too -- by headroom (the new request becomes
+            (100 − headroom)% of the limit) or to an absolute value; a limit the manifest doesn't
+            declare is never added.
           </p>
         </div>
       )}
