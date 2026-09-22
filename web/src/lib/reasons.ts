@@ -12,5 +12,9 @@ export const REASON_LABELS: Record<string, string> = {
 
 export function formatReasons(reasons?: string[]): string | undefined {
   if (!reasons || reasons.length === 0) return undefined
-  return reasons.map((r) => REASON_LABELS[r] ?? r).join(', ')
+  const labels = reasons.map((r) => REASON_LABELS[r] ?? r)
+  // CPU and memory can independently fail for the same reason (e.g. both
+  // below the minimum change threshold) -- collapse duplicates so the
+  // combined message doesn't repeat itself.
+  return [...new Set(labels)].join(', ')
 }

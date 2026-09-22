@@ -59,6 +59,19 @@ export interface RecommendationDTO {
   currentValueError?: string
   warnings?: string[]
   validationErrors?: string[]
+
+  // Operation carries branch/commit/error detail for the most recent
+  // write-back attempt, once one exists (status has moved past new/selected).
+  operation?: OperationDTO
+}
+
+// OperationDTO mirrors internal/api/dto.go's OperationDTO.
+export interface OperationDTO {
+  branch?: string
+  commitSha?: string
+  prUrl?: string
+  errorMessage?: string
+  updatedAt: string
 }
 
 export interface ListRecommendationsResponse {

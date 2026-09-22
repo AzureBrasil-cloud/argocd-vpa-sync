@@ -4,7 +4,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 // Config is the controller's runtime configuration.
@@ -20,16 +23,21 @@ type Config struct {
 	// ArgoCDNamespace is where Argo CD (and its repository credential
 	// Secrets) live.
 	ArgoCDNamespace string
+
+	// WriteBackPollInterval is how often the write-back worker checks
+	// StateStore for newly queued selections.
+	WriteBackPollInterval time.Duration
 }
 
 // Default returns a Config with the same defaults documented in
 // deploy/manifests/Deployment's env vars.
 func Default() Config {
 	return Config{
-		ListenAddr:           ":8080",
-		StateSecretNamespace: "argocd-vpa-updater",
-		StateSecretName:      "argocd-vpa-updater-state",
-		ArgoCDNamespace:      "argocd",
+		ListenAddr:            ":8080",
+		StateSecretNamespace:  "argocd-vpa-updater",
+		StateSecretName:       "argocd-vpa-updater-state",
+		ArgoCDNamespace:       "argocd",
+		WriteBackPollInterval: 20 * time.Second,
 	}
 }
 
@@ -49,6 +57,13 @@ func FromEnv() (Config, error) {
 	}
 	if v := os.Getenv("ARGOCD_NAMESPACE"); v != "" {
 		cfg.ArgoCDNamespace = v
+	}
+	if v := os.Getenv("WRITEBACK_POLL_INTERVAL_SECONDS"); v != "" {
+		seconds, err := strconv.Atoi(v)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("config: WRITEBACK_POLL_INTERVAL_SECONDS must be a positive integer, got %q", v)
+		}
+		cfg.WriteBackPollInterval = time.Duration(seconds) * time.Second
 	}
 
 	return cfg, nil

@@ -12,7 +12,7 @@ export function EligibilityBadge({ eligible, reasons }: EligibilityBadgeProps) {
   const label = formatReasons(reasons)
   return (
     <span className="badge badge-ineligible" title={label}>
-      Not eligible{label ? `: ${label}` : ''}
+      Not eligible
     </span>
   )
 }

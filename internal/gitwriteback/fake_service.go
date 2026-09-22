@@ -207,7 +207,7 @@ func effectiveCommitMessage(req WriteBackRequest) string {
 	if req.CommitMessage != "" {
 		return req.CommitMessage
 	}
-	return fmt.Sprintf("argocd-vpa-updater: update %s resources for container %q", req.Target.FilePath, req.Target.ContainerName)
+	return fmt.Sprintf("build: automatic update of %s", req.Target.Workload.Name)
 }
 
 // checkoutWorkingBranch checks the worktree out onto the local branch

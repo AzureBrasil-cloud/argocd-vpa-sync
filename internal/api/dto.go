@@ -1,6 +1,10 @@
 package api
 
-import "github.com/azurebrasil/argocd-vpa-updater/internal/domain"
+import (
+	"time"
+
+	"github.com/azurebrasil/argocd-vpa-updater/internal/domain"
+)
 
 // WorkloadDTO identifies the workload a recommendation targets.
 type WorkloadDTO struct {
@@ -71,6 +75,22 @@ type RecommendationDTO struct {
 	// annotations failed validation (Valid=false); no target could even be
 	// resolved.
 	ValidationErrors []string `json:"validationErrors,omitempty"`
+
+	// Operation carries branch/commit/error detail for the most recent
+	// write-back attempt, once one exists (Status has moved past "new" or
+	// "selected"). Nil when nothing has been applied/attempted yet.
+	Operation *OperationDTO `json:"operation,omitempty"`
+}
+
+// OperationDTO is the write-back detail surfaced for one recommendation: the
+// branch/commit a successful apply landed on, or the error a failed/conflict
+// one recorded.
+type OperationDTO struct {
+	Branch       string    `json:"branch,omitempty"`
+	CommitSHA    string    `json:"commitSha,omitempty"`
+	PRURL        string    `json:"prUrl,omitempty"`
+	ErrorMessage string    `json:"errorMessage,omitempty"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // ListRecommendationsResponse is the body of GET /api/v1/recommendations.

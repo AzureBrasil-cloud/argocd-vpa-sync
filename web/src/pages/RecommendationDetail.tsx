@@ -4,6 +4,7 @@ import { getRecommendation, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
 import { ResourceCheckbox } from '../components/ResourceCheckbox'
+import { StatusBadge } from '../components/StatusBadge'
 import { formatCPU, formatMemory } from '../lib/format'
 
 export function RecommendationDetail() {
@@ -28,6 +29,18 @@ export function RecommendationDetail() {
       cancelled = true
     }
   }, [load])
+
+  // See RecommendationList's identical polling: the write-back worker picks
+  // this up asynchronously, so keep refreshing while its status is still
+  // in-progress.
+  const hasInFlightWriteBack = item?.status === 'selected' || item?.status === 'applying'
+  useEffect(() => {
+    if (!hasInFlightWriteBack) return
+    const id = setInterval(() => {
+      load().catch(() => {})
+    }, 4000)
+    return () => clearInterval(id)
+  }, [hasInFlightWriteBack, load])
 
   async function handleAccept() {
     if (!selectCPU && !selectMemory) return
@@ -65,8 +78,20 @@ export function RecommendationDetail() {
                 {item.namespace} &middot; {item.workload.kind}/{item.workload.name} &middot; VPA mode {item.updateMode}
               </p>
             </div>
-            <span className={`status status-pill status-${item.status}`}>{item.status}</span>
+            <StatusBadge status={item.status} operation={item.operation} pill />
           </div>
+
+          {item.status === 'failed' && item.operation?.errorMessage && (
+            <div className="panel panel-error">
+              <strong>Write-back failed:</strong> {item.operation.errorMessage}
+            </div>
+          )}
+
+          {item.status === 'applied' && item.operation?.commitSha && (
+            <p className="muted">
+              Applied to <code>{item.operation.branch}</code> as <code>{item.operation.commitSha.slice(0, 7)}</code>
+            </p>
+          )}
 
           {item.validationErrors && item.validationErrors.length > 0 && (
             <div className="panel panel-error">

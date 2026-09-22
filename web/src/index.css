@@ -406,6 +406,13 @@ table {
   font-weight: 600;
 }
 
+.badge-ok {
+  background: color-mix(in srgb, var(--eligible) 15%, transparent);
+  color: var(--eligible);
+  padding: 3px 7px;
+  font-weight: 700;
+}
+
 .status {
   font-size: 11px;
   font-weight: 600;
@@ -426,6 +433,18 @@ table {
 .status-applied { color: var(--eligible); }
 .status-skipped { color: var(--muted); }
 .status-failed { color: var(--error); }
+
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-commit {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
 
 .detail {
   padding: 24px 28px;

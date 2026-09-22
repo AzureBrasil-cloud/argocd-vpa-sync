@@ -41,6 +41,16 @@ type OperationState struct {
 
 // PendingSelection records that a user has selected a recommendation for
 // write-back but the operation has not yet been (or is still being) applied.
+//
+// Target/ApplyCPU/ApplyMemory/RecommendationSummary/Override*/CommitMessage
+// (schema v2+) capture everything a later write-back attempt needs to build
+// a gitwriteback.WriteBackRequest, so that processing a selection never has
+// to re-resolve the binding or re-read live workload values -- what actually
+// gets applied is exactly the eligibility verdict the dashboard showed the
+// user at selection time, not whatever the live state happens to be by the
+// time it's processed. A PendingSelection persisted before schema v2 has a
+// zero-value Target (Target.RepoURL == "") and must be treated as
+// unprocessable by anything that consumes it.
 type PendingSelection struct {
 	IdempotencyKey string    `json:"idempotencyKey"`
 	VPANamespace   string    `json:"vpaNamespace"`
@@ -48,6 +58,14 @@ type PendingSelection struct {
 	ContainerName  string    `json:"containerName"`
 	SelectedAt     time.Time `json:"selectedAt"`
 	SelectedBy     string    `json:"selectedBy,omitempty"`
+
+	Target                WriteTarget     `json:"target"`
+	ApplyCPU              bool            `json:"applyCPU,omitempty"`
+	ApplyMemory           bool            `json:"applyMemory,omitempty"`
+	RecommendationSummary ResourceAmount  `json:"recommendationSummary"`
+	OverrideCPU           *ResourceAmount `json:"overrideCPU,omitempty"`
+	OverrideMemory        *ResourceAmount `json:"overrideMemory,omitempty"`
+	CommitMessage         string          `json:"commitMessage,omitempty"`
 }
 
 // StateDocument is the entire content of the argocd-vpa-updater-state
@@ -60,7 +78,15 @@ type StateDocument struct {
 }
 
 // CurrentStateSchemaVersion is the schema version written by this build.
-const CurrentStateSchemaVersion = 1
+//
+// v2 added PendingSelection.Target/ApplyCPU/ApplyMemory/RecommendationSummary
+// (and the Override*/CommitMessage fields) so a write-back worker can build
+// a request without re-resolving the binding. A v1 (or earlier, unversioned)
+// PendingSelection decodes with a zero-value Target and must be treated as
+// unprocessable by anything that consumes it (see PendingSelection's doc
+// comment) -- there is no in-place rewrite of old documents on read, only
+// this defensive check by consumers.
+const CurrentStateSchemaVersion = 2
 
 // NewEmptyStateDocument returns a valid, empty StateDocument at the current
 // schema version.

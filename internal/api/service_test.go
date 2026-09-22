@@ -197,6 +197,41 @@ func TestListRecommendations_ReflectsPendingSelectionStatus(t *testing.T) {
 	}
 }
 
+func TestListRecommendations_SurfacesOperationDetailOnceApplied(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+
+	err := svc.State.Update(context.Background(), func(doc *domain.StateDocument) error {
+		doc.Operations["sha256:whatever"] = domain.OperationState{
+			IdempotencyKey: "sha256:whatever",
+			VPANamespace:   "payments",
+			VPAName:        "checkout-api-vpa",
+			ContainerName:  "app",
+			Status:         domain.OperationApplied,
+			Branch:         "main",
+			CommitSHA:      "abc123",
+			UpdatedAt:      time.Now(),
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if items[0].Status != "applied" {
+		t.Fatalf("expected status 'applied', got %q", items[0].Status)
+	}
+	if items[0].Operation == nil {
+		t.Fatalf("expected Operation to be populated")
+	}
+	if items[0].Operation.Branch != "main" || items[0].Operation.CommitSHA != "abc123" {
+		t.Fatalf("expected branch/commit to be surfaced, got %+v", items[0].Operation)
+	}
+}
+
 func TestListRecommendations_MultipleContainersProduceOneItemEach(t *testing.T) {
 	vpa := sampleVPA()
 	vpa.Binding.Containers = append(vpa.Binding.Containers, domain.ContainerWriteBackConfig{

@@ -144,20 +144,30 @@ func lookupNode(root *kyaml.RNode, rawPath string) (*kyaml.RNode, error) {
 	return node, nil
 }
 
-// setQuantity sets the scalar node at rawPath to q's canonical string form.
-// It returns changed=false, nil when the file already holds a numerically
-// equal value, so callers can treat that as a no-op rather than a write.
+// setQuantity sets the scalar node at rawPath to q, formatted using the same
+// unit suffix the file's existing value already uses (see
+// formatLikeExisting). It returns changed=false, nil when the file already
+// holds a numerically equal value, so callers can treat that as a no-op
+// rather than a write.
 func setQuantity(root *kyaml.RNode, rawPath string, q resource.Quantity) (bool, error) {
 	node, err := lookupNode(root, rawPath)
 	if err != nil {
 		return false, err
 	}
 
-	current, err := resource.ParseQuantity(node.YNode().Value)
+	existingRaw := node.YNode().Value
+	current, err := resource.ParseQuantity(existingRaw)
 	if err == nil && current.MilliValue() == q.MilliValue() {
 		return false, nil
 	}
 
-	node.YNode().Value = q.String()
+	node.YNode().Value = formatLikeExisting(existingRaw, q)
+	// The node's Tag was resolved from the OLD value (e.g. "!!int" for a
+	// plain "1"); left in place, a new value of a different implicit kind
+	// (e.g. "0.7", a float) would force the encoder to emit an incorrect
+	// explicit tag ("!!int 0.7", not valid YAML/int). Clearing it lets the
+	// encoder re-infer the correct implicit tag from the new value, exactly
+	// as if a human had hand-written it.
+	node.YNode().Tag = ""
 	return true, nil
 }

@@ -10,7 +10,7 @@ import {
   SelectionSummary,
   type SelectedRow,
 } from "../components/SelectionSummary";
-import { formatAge } from "../lib/format";
+import { StatusBadge } from "../components/StatusBadge";
 
 type RowKey = string;
 type ViewMode = "table" | "cards";
@@ -32,11 +32,9 @@ type SortKey =
   | "namespace"
   | "vpaName"
   | "workload"
-  | "containerName"
   | "updateMode"
   | "cpuDelta"
   | "memoryDelta"
-  | "age"
   | "eligibility"
   | "status";
 type SortDirection = "asc" | "desc";
@@ -50,11 +48,9 @@ const SORT_COLUMNS: { key: SortKey; label: string }[] = [
   { key: "namespace", label: "Namespace" },
   { key: "vpaName", label: "VPA" },
   { key: "workload", label: "Workload" },
-  { key: "containerName", label: "Container" },
   { key: "updateMode", label: "Mode" },
   { key: "cpuDelta", label: "CPU" },
   { key: "memoryDelta", label: "Memory" },
-  { key: "age", label: "Age" },
   { key: "eligibility", label: "Eligibility" },
   { key: "status", label: "Status" },
 ];
@@ -70,16 +66,12 @@ function sortValue(
       return item.vpaName;
     case "workload":
       return `${item.workload.kind}/${item.workload.name}`;
-    case "containerName":
-      return item.containerName;
     case "updateMode":
       return item.updateMode;
     case "cpuDelta":
       return item.deltaCpuPercent ?? null;
     case "memoryDelta":
       return item.deltaMemoryPercent ?? null;
-    case "age":
-      return item.recommendationAgeSeconds;
     case "eligibility":
       return item.eligible ? 1 : 0;
     case "status":
@@ -97,15 +89,30 @@ function compareBySort(
 ): number {
   const av = sortValue(a, sort.key);
   const bv = sortValue(b, sort.key);
-  if (av === null && bv === null) return 0;
-  if (av === null) return 1;
-  if (bv === null) return -1;
 
-  const cmp =
-    typeof av === "number" && typeof bv === "number"
-      ? av - bv
-      : String(av).localeCompare(String(bv));
-  return sort.direction === "asc" ? cmp : -cmp;
+  let cmp: number;
+  if (av === null && bv === null) {
+    cmp = 0;
+  } else if (av === null) {
+    return 1;
+  } else if (bv === null) {
+    return -1;
+  } else {
+    const raw =
+      typeof av === "number" && typeof bv === "number"
+        ? av - bv
+        : String(av).localeCompare(String(bv));
+    cmp = sort.direction === "asc" ? raw : -raw;
+  }
+
+  if (cmp !== 0) return cmp;
+
+  // Tie-breaker: rows equal on the sorted column keep a fixed relative
+  // order regardless of which order the backend happened to return them in
+  // (its cache is a Go map, so that order isn't guaranteed stable across
+  // polls) -- without this, tied rows would visibly shuffle every few
+  // seconds as the list re-polls in the background.
+  return rowKey(a).localeCompare(rowKey(b));
 }
 
 export function RecommendationList() {
@@ -152,6 +159,25 @@ export function RecommendationList() {
       cancelled = true;
     };
   }, [load]);
+
+  // The write-back worker picks up a "selected" item asynchronously (up to
+  // PollInterval later, see internal/writebackworker) and moves it through
+  // applying -> applied/failed. Poll while anything is in one of those
+  // in-progress states so that transition shows up without a manual refresh;
+  // stop as soon as nothing is pending, rather than polling forever.
+  const hasInFlightWriteBack = (items ?? []).some(
+    (item) => item.status === "selected" || item.status === "applying",
+  );
+  useEffect(() => {
+    if (!hasInFlightWriteBack) return;
+    const id = setInterval(() => {
+      load().catch(() => {
+        // A transient poll failure isn't worth surfacing over the existing
+        // view; the next tick (or a manual reload) will recover.
+      });
+    }, 4000);
+    return () => clearInterval(id);
+  }, [hasInFlightWriteBack, load]);
 
   function toggle(key: RowKey, resource: "cpu" | "memory", checked: boolean) {
     setSelection((prev) => ({
@@ -453,7 +479,6 @@ export function RecommendationList() {
                     <td className="cell-muted">
                       {item.workload.kind}/{item.workload.name}
                     </td>
-                    <td>{item.containerName}</td>
                     <td className="cell-muted">{item.updateMode}</td>
                     <td>
                       <div className="resource-cell">
@@ -491,9 +516,6 @@ export function RecommendationList() {
                         />
                       </div>
                     </td>
-                    <td className="cell-muted">
-                      {formatAge(item.recommendationAgeSeconds)}
-                    </td>
                     <td>
                       {item.currentValueError ? (
                         <span
@@ -510,9 +532,7 @@ export function RecommendationList() {
                       )}
                     </td>
                     <td>
-                      <span className={`status status-${item.status}`}>
-                        {item.status}
-                      </span>
+                      <StatusBadge status={item.status} operation={item.operation} />
                     </td>
                     <td>
                       <button

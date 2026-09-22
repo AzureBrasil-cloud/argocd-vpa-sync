@@ -26,12 +26,17 @@ import (
 	"github.com/azurebrasil/argocd-vpa-updater/internal/argocdapp"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/config"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/controller"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/credentials"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/gitexec"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/gitwriteback"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/patcher"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/resolver"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/statestore"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/version"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/vpaapi"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/vparecommendation"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/workloadresources"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/writebackworker"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -100,6 +105,18 @@ func run(logger *slog.Logger) error {
 		State:          statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),
 	}
 	server := api.NewServer(svc, logger)
+
+	writeBackWorker := &writebackworker.Worker{
+		State:        statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),
+		WriteBack:    gitwriteback.NewCLIGitWriteBackService(gitexec.NewRunner()),
+		Credentials:  credentials.NewArgoCDSecretProvider(mgr.GetClient(), cfg.ArgoCDNamespace),
+		Patchers:     patcher.DefaultRegistry(),
+		Logger:       logger,
+		PollInterval: cfg.WriteBackPollInterval,
+	}
+	if err := mgr.Add(writeBackWorker); err != nil {
+		return fmt.Errorf("register write-back worker: %w", err)
+	}
 
 	httpServer := &http.Server{Addr: cfg.ListenAddr, Handler: server}
 

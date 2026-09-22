@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -65,6 +66,18 @@ func (s *Service) ListRecommendations(ctx context.Context) ([]RecommendationDTO,
 	if err != nil {
 		return nil, fmt.Errorf("api: list opted-in VPAs: %w", err)
 	}
+	// ListOptedIn's order is not guaranteed stable across calls (the default
+	// reader's backing Cache is a Go map, and Go intentionally randomizes map
+	// iteration order) -- without this, the dashboard's row order would
+	// shuffle on every poll for any VPAs the client's own sort treats as tied
+	// (e.g. same namespace), which is disruptive to look at even though the
+	// data itself hasn't changed.
+	sort.Slice(vpas, func(i, j int) bool {
+		if vpas[i].Namespace != vpas[j].Namespace {
+			return vpas[i].Namespace < vpas[j].Namespace
+		}
+		return vpas[i].Name < vpas[j].Name
+	})
 
 	doc, _, err := s.State.Get(ctx)
 	if err != nil {
@@ -186,6 +199,21 @@ func (s *Service) baseDTO(vpa domain.NormalizedVPA, cr domain.ContainerRecommend
 		UpperBoundMemory:         quantityString(cr.UpperBound.Memory),
 		RecommendationAgeSeconds: ageSeconds,
 		Status:                   statusFor(doc, vpa.Namespace, vpa.Name, cr.ContainerName),
+		Operation:                operationDTOFor(doc, vpa.Namespace, vpa.Name, cr.ContainerName),
+	}
+}
+
+func operationDTOFor(doc *domain.StateDocument, namespace, vpaName, containerName string) *OperationDTO {
+	op := operationFor(doc, namespace, vpaName, containerName)
+	if op == nil {
+		return nil
+	}
+	return &OperationDTO{
+		Branch:       op.Branch,
+		CommitSHA:    op.CommitSHA,
+		PRURL:        op.PRURL,
+		ErrorMessage: op.ErrorMessage,
+		UpdatedAt:    op.UpdatedAt,
 	}
 }
 
@@ -339,11 +367,15 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 	}
 
 	return domain.PendingSelection{
-		IdempotencyKey: idempotency.Key(vpa.Namespace, vpa.Name, eval.Target, patchReq),
-		VPANamespace:   vpa.Namespace,
-		VPAName:        vpa.Name,
-		ContainerName:  cr.ContainerName,
-		SelectedAt:     s.now(),
+		IdempotencyKey:        idempotency.Key(vpa.Namespace, vpa.Name, eval.Target, patchReq),
+		VPANamespace:          vpa.Namespace,
+		VPAName:               vpa.Name,
+		ContainerName:         cr.ContainerName,
+		SelectedAt:            s.now(),
+		Target:                eval.Target,
+		ApplyCPU:              wantCPU,
+		ApplyMemory:           wantMemory,
+		RecommendationSummary: cr.Target,
 	}, nil
 }
 
@@ -475,17 +507,9 @@ func finitePercent(d eligibility.Delta) *float64 {
 	return &v
 }
 
-// statusFor looks up the most relevant known state for (namespace, vpaName,
-// containerName): a pending selection wins over a past operation, and among
-// operations the most recently updated one wins. Absent any entry, "new" is
-// the default per the acceptance criteria's status enum.
-func statusFor(doc *domain.StateDocument, namespace, vpaName, containerName string) string {
-	for _, sel := range doc.PendingSelections {
-		if sel.VPANamespace == namespace && sel.VPAName == vpaName && sel.ContainerName == containerName {
-			return "selected"
-		}
-	}
-
+// operationFor returns the most recently updated Operations entry for
+// (namespace, vpaName, containerName), or nil if there is none.
+func operationFor(doc *domain.StateDocument, namespace, vpaName, containerName string) *domain.OperationState {
 	var latest *domain.OperationState
 	for k := range doc.Operations {
 		op := doc.Operations[k]
@@ -497,6 +521,21 @@ func statusFor(doc *domain.StateDocument, namespace, vpaName, containerName stri
 			latest = &opCopy
 		}
 	}
+	return latest
+}
+
+// statusFor looks up the most relevant known state for (namespace, vpaName,
+// containerName): a pending selection wins over a past operation, and among
+// operations the most recently updated one wins. Absent any entry, "new" is
+// the default per the acceptance criteria's status enum.
+func statusFor(doc *domain.StateDocument, namespace, vpaName, containerName string) string {
+	for _, sel := range doc.PendingSelections {
+		if sel.VPANamespace == namespace && sel.VPAName == vpaName && sel.ContainerName == containerName {
+			return "selected"
+		}
+	}
+
+	latest := operationFor(doc, namespace, vpaName, containerName)
 	if latest == nil {
 		return "new"
 	}

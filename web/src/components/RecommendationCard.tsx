@@ -4,6 +4,7 @@ import { formatAge } from '../lib/format'
 import { DeltaBadge } from './DeltaBadge'
 import { EligibilityBadge } from './EligibilityBadge'
 import { ResourceCheckbox } from './ResourceCheckbox'
+import { StatusBadge } from './StatusBadge'
 
 interface RecommendationCardProps {
   item: RecommendationDTO
@@ -41,7 +42,7 @@ export function RecommendationCard({
             {item.namespace} &middot; {item.workload.kind}/{item.workload.name} &middot; {item.updateMode}
           </p>
         </div>
-        <span className={`status status-${item.status}`}>{item.status}</span>
+        <StatusBadge status={item.status} operation={item.operation} />
       </div>
 
       <div className="recommendation-card-row">

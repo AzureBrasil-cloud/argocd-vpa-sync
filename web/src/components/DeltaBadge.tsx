@@ -28,12 +28,20 @@ export function DeltaBadge({ current, recommended, percent, kind }: DeltaBadgePr
 
   const rounded = Math.round(percent * 10) / 10
   const sign = rounded > 0 ? '+' : ''
+  const alreadyMatches = rounded === 0
   const badgeKind = rounded > 0 ? 'badge-increase' : rounded < 0 ? 'badge-decrease' : 'badge-muted'
 
   return (
-    <span className={`badge ${badgeKind}`} title={title}>
-      {currentLabel} → {recommendedLabel} ({sign}
-      {rounded}%)
-    </span>
+    <>
+      <span className={`badge ${badgeKind}`} title={title}>
+        {currentLabel} → {recommendedLabel} ({sign}
+        {rounded}%)
+      </span>
+      {alreadyMatches && (
+        <span className="badge badge-ok" title="Already matches the recommendation" aria-label="Already matches the recommendation">
+          ✓
+        </span>
+      )}
+    </>
   )
 }

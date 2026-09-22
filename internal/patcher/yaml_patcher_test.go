@@ -66,6 +66,79 @@ func TestYAMLPatcher_ReadCurrentValues(t *testing.T) {
 	}
 }
 
+// TestYAMLPatcher_Patch_RawByteRecommendationGetsMiSuffixNotQuotedBytes is a
+// regression test: VPA memory recommendations are typically an exact byte
+// count with no clean Ki/Mi/Gi divisor (e.g. 148858618, not 156237824 ==
+// 149Mi). Patching "256Mi" with that raw value used to produce
+// `memory: "148858618"` (a bare, quoted byte count) instead of a normal,
+// unquoted Mi-suffixed value.
+func TestYAMLPatcher_Patch_RawByteRecommendationGetsMiSuffixNotQuotedBytes(t *testing.T) {
+	p := NewYAMLPatcher()
+	req := domain.PatchRequest{
+		Target:      deploymentTarget(),
+		ApplyMemory: true,
+		Recommendation: domain.ContainerRecommendation{
+			Target: domain.ResourceAmount{
+				Memory: qptr("148858618"),
+			},
+		},
+	}
+
+	newContent, result, err := p.Patch(context.Background(), []byte(deploymentYAML), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("expected Changed=true")
+	}
+
+	newText := string(newContent)
+	if !strings.Contains(newText, "memory: 142Mi") {
+		t.Fatalf("expected memory: 142Mi (unquoted), got:\n%s", newText)
+	}
+	if strings.Contains(newText, `"148858618"`) || strings.Contains(newText, "148858618") {
+		t.Fatalf("expected the raw byte count to never appear in the patched output, got:\n%s", newText)
+	}
+}
+
+// TestYAMLPatcher_Patch_SubCoreCPURecommendationAgainstNoSuffixField is a
+// regression test for the CPU counterpart of the memory bug above: a
+// no-suffix existing cpu value (e.g. "cpu: 1") must receive a genuine
+// sub-core recommendation (e.g. 700m) as "0.7", never rounded up to "1" --
+// which would silently request more CPU than the VPA recommended, the exact
+// opposite of what applying a downward recommendation is supposed to do.
+func TestYAMLPatcher_Patch_SubCoreCPURecommendationAgainstNoSuffixField(t *testing.T) {
+	p := NewHelmValuesPatcher()
+	target := domain.WriteTarget{
+		FilePath:   "apps/payments/values-prd.yaml",
+		SourceType: domain.SourceTypeHelmValues,
+		CPUKeyPath: "resources.limits.cpu",
+	}
+	req := domain.PatchRequest{
+		Target:   target,
+		ApplyCPU: true,
+		Recommendation: domain.ContainerRecommendation{
+			Target: domain.ResourceAmount{CPU: qptr("700m")},
+		},
+	}
+
+	newContent, result, err := p.Patch(context.Background(), []byte(helmValuesYAML), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("expected Changed=true")
+	}
+
+	newText := string(newContent)
+	if !strings.Contains(newText, "cpu: 0.7") {
+		t.Fatalf("expected cpu: 0.7, got:\n%s", newText)
+	}
+	if strings.Contains(newText, "cpu: 1\n") {
+		t.Fatalf("expected the original cpu: 1 to have been replaced, not left in place, got:\n%s", newText)
+	}
+}
+
 func TestYAMLPatcher_Patch_OnlyTargetKeysChange(t *testing.T) {
 	p := NewYAMLPatcher()
 	req := domain.PatchRequest{
