@@ -1,0 +1,15 @@
+# Go
+/bin/
+*.test
+*.out
+
+# Node / web
+web/node_modules/
+web/dist/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
