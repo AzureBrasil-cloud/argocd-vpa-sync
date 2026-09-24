@@ -55,7 +55,7 @@ export function RecommendationCard({
           onChange={(checked) => onToggle('cpu', checked)}
         />
         <span className="recommendation-card-row-label">CPU</span>
-        <DeltaBadge kind="cpu" current={item.currentCpu} recommended={item.recommendedCpu} percent={item.deltaCpuPercent} />
+        <DeltaBadge kind="cpu" current={item.currentCpu} recommended={item.targetCpu ?? item.recommendedCpu} vpa={item.recommendedCpu} headroomPercent={item.cpuRequestHeadroomPercent} percent={item.deltaCpuPercent} />
       </div>
 
       <div className="recommendation-card-row">
@@ -71,7 +71,7 @@ export function RecommendationCard({
         <DeltaBadge
           kind="memory"
           current={item.currentMemory}
-          recommended={item.recommendedMemory}
+          recommended={item.targetMemory ?? item.recommendedMemory} vpa={item.recommendedMemory} headroomPercent={item.memoryRequestHeadroomPercent}
           percent={item.deltaMemoryPercent}
         />
       </div>

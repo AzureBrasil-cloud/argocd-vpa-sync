@@ -11,8 +11,9 @@ import {
   type SelectedRow,
 } from "../components/SelectionSummary";
 import { StatusBadge } from "../components/StatusBadge";
-import { decideLimit } from "../lib/limits";
+import { planSelection } from "../lib/selectionPlan";
 import { useLimitSettings } from "../lib/useLimitSettings";
+import { useRequestHeadroom } from "../lib/useRequestHeadroom";
 
 type RowKey = string;
 type ViewMode = "table" | "cards";
@@ -128,6 +129,7 @@ export function RecommendationList() {
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const limits = useLimitSettings();
+  const headroom = useRequestHeadroom();
 
   const [sort, setSort] = useState<SortState>({
     key: "namespace",
@@ -182,17 +184,14 @@ export function RecommendationList() {
     return () => clearInterval(id);
   }, [hasInFlightWriteBack, load]);
 
-  // The limit specs to send for one row's selection: required limits always,
-  // optional ones only when opted in (see decideLimit). null while a limit
-  // that is to be written has an invalid setting.
+  // The request headroom and limit specs to send for one row's selection
+  // (see planSelection). null while a setting that is to be sent is invalid.
   function limitSpecsFor(
     item: RecommendationDTO,
     sel: RowSelection,
-  ): Pick<SelectRequest, "cpuLimit" | "memoryLimit"> | null {
-    const cpu = sel.cpu ? decideLimit(item, "cpu", limits) : null;
-    const memory = sel.memory ? decideLimit(item, "memory", limits) : null;
-    if (cpu?.invalid || memory?.invalid) return null;
-    return { cpuLimit: cpu?.parsed?.spec, memoryLimit: memory?.parsed?.spec };
+  ): Omit<SelectRequest, "applyCPU" | "applyMemory"> | null {
+    const plan = planSelection(item, sel, limits, headroom);
+    return plan.invalid ? null : plan.body;
   }
 
   function toggle(key: RowKey, resource: "cpu" | "memory", checked: boolean) {
@@ -208,7 +207,7 @@ export function RecommendationList() {
     if (!sel.cpu && !sel.memory) return;
     const limitSpecs = limitSpecsFor(item, sel);
     if (!limitSpecs) {
-      setRowError((prev) => ({ ...prev, [key]: "invalid limit setting" }));
+      setRowError((prev) => ({ ...prev, [key]: "invalid headroom or limit setting" }));
       return;
     }
 
@@ -380,6 +379,7 @@ export function RecommendationList() {
           busy={summaryBusy}
           error={summaryError}
           limits={limits}
+          headroom={headroom}
           onRemove={removeFromSelection}
           onClear={clearSelection}
           onApply={applySelection}
@@ -512,7 +512,7 @@ export function RecommendationList() {
                         <DeltaBadge
                           kind="cpu"
                           current={item.currentCpu}
-                          recommended={item.recommendedCpu}
+                          recommended={item.targetCpu ?? item.recommendedCpu} vpa={item.recommendedCpu} headroomPercent={item.cpuRequestHeadroomPercent}
                           percent={item.deltaCpuPercent}
                         />
                       </div>
@@ -530,7 +530,7 @@ export function RecommendationList() {
                         <DeltaBadge
                           kind="memory"
                           current={item.currentMemory}
-                          recommended={item.recommendedMemory}
+                          recommended={item.targetMemory ?? item.recommendedMemory} vpa={item.recommendedMemory} headroomPercent={item.memoryRequestHeadroomPercent}
                           percent={item.deltaMemoryPercent}
                         />
                       </div>
@@ -581,6 +581,7 @@ export function RecommendationList() {
         busy={summaryBusy}
         error={summaryError}
         limits={limits}
+        headroom={headroom}
         onRemove={removeFromSelection}
         onClear={clearSelection}
         onApply={applySelection}

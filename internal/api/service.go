@@ -224,12 +224,19 @@ func operationDTOFor(doc *domain.StateDocument, namespace, vpaName, containerNam
 func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, doc *domain.StateDocument) RecommendationDTO {
 	dto := s.baseDTO(vpa, cr, doc)
 
-	eval, err := s.evaluate(ctx, vpa, cr)
+	headroom := doc.RequestHeadroomFor(vpa.Namespace, vpa.Name, cr.ContainerName)
+	dto.CPURequestHeadroomPercent = headroom.CPUPercent
+	dto.MemoryRequestHeadroomPercent = headroom.MemoryPercent
+
+	eval, err := s.evaluate(ctx, vpa, cr, headroom)
 	dto.Warnings = eval.Target.Warnings
 	if err != nil {
 		dto.CurrentValueError = err.Error()
 		return dto
 	}
+
+	dto.TargetCPU = quantityString(eval.Desired.CPU)
+	dto.TargetMemory = quantityString(eval.Desired.Memory)
 
 	dto.CurrentCPU = quantityString(eval.Current.CPU)
 	dto.CurrentMemory = quantityString(eval.Current.Memory)
@@ -237,10 +244,10 @@ func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 	dto.CurrentMemoryLimit = quantityString(eval.CurrentLimits.Memory)
 	dto.CPULimitConfigured = eval.Target.CPULimitKeyPath != ""
 	dto.MemoryLimitConfigured = eval.Target.MemoryLimitKeyPath != ""
-	dto.CPULimitRequired = limitRequired(eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, cr.Target.CPU)
-	dto.MemoryLimitRequired = limitRequired(eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, cr.Target.Memory)
-	dto.CPULimitExceeded = limitExceeded(eval.CurrentLimits.CPU, cr.Target.CPU)
-	dto.MemoryLimitExceeded = limitExceeded(eval.CurrentLimits.Memory, cr.Target.Memory)
+	dto.CPULimitRequired = limitRequired(eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, eval.Desired.CPU)
+	dto.MemoryLimitRequired = limitRequired(eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, eval.Desired.Memory)
+	dto.CPULimitExceeded = limitExceeded(eval.CurrentLimits.CPU, eval.Desired.CPU)
+	dto.MemoryLimitExceeded = limitExceeded(eval.CurrentLimits.Memory, eval.Desired.Memory)
 	dto.DeltaCPUAbsoluteMilli = eval.CPUDelta.AbsoluteMilli
 	dto.DeltaCPUPercent = finitePercent(eval.CPUDelta)
 	dto.DeltaMemoryAbsoluteMilli = eval.MemoryDelta.AbsoluteMilli
@@ -267,12 +274,19 @@ type evaluation struct {
 	Target        domain.WriteTarget
 	Current       domain.ResourceAmount
 	CurrentLimits domain.ResourceAmount
-	CPUDelta      eligibility.Delta
-	MemoryDelta   eligibility.Delta
-	Eligibility   eligibility.Result
+	// Desired is the VPA recommendation plus the container's recorded
+	// request headroom -- what the live request is compared against.
+	Desired     domain.ResourceAmount
+	CPUDelta    eligibility.Delta
+	MemoryDelta eligibility.Delta
+	Eligibility eligibility.Result
 }
 
-func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation) (evaluation, error) {
+// evaluate compares the live request against the recommendation plus
+// headroom (the container's recorded domain.RequestHeadroom), so a
+// container already carrying the headroom it was last applied with isn't
+// offered a change back down to the bare recommendation.
+func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, headroom domain.RequestHeadroom) (evaluation, error) {
 	var eval evaluation
 
 	target, err := s.Resolver.Resolve(ctx, vpa, cr.ContainerName)
@@ -289,8 +303,15 @@ func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 	eval.Current = current
 	eval.CurrentLimits = values.Limits
 
-	eval.CPUDelta = eligibility.ComputeDelta(current.CPU, cr.Target.CPU)
-	eval.MemoryDelta = eligibility.ComputeDelta(current.Memory, cr.Target.Memory)
+	if eval.Desired.CPU, err = domain.RequestWithHeadroom(cr.Target.CPU, headroom.CPUPercent, true); err != nil {
+		return eval, fmt.Errorf("recorded cpu request headroom: %w", err)
+	}
+	if eval.Desired.Memory, err = domain.RequestWithHeadroom(cr.Target.Memory, headroom.MemoryPercent, false); err != nil {
+		return eval, fmt.Errorf("recorded memory request headroom: %w", err)
+	}
+
+	eval.CPUDelta = eligibility.ComputeDelta(current.CPU, eval.Desired.CPU)
+	eval.MemoryDelta = eligibility.ComputeDelta(current.Memory, eval.Desired.Memory)
 	eval.Eligibility = eligibility.Evaluate(eligibility.Input{
 		CPU:              eval.CPUDelta,
 		Memory:           eval.MemoryDelta,
@@ -310,11 +331,26 @@ type SelectOptions struct {
 	ApplyMemory bool
 	CPULimit    *domain.LimitSpec
 	MemoryLimit *domain.LimitSpec
+
+	// CPURequestHeadroom / MemoryRequestHeadroom (percent, nil = none) write
+	// the request above the recommendation, see domain.RequestWithHeadroom.
+	CPURequestHeadroom    *float64
+	MemoryRequestHeadroom *float64
 }
 
 func (o SelectOptions) validate() error {
 	if !o.ApplyCPU && !o.ApplyMemory {
 		return fmt.Errorf("%w: no resource selected", ErrRecommendationNotEligible)
+	}
+	if o.CPURequestHeadroom != nil {
+		if err := domain.ValidateHeadroomPercent(*o.CPURequestHeadroom); err != nil {
+			return fmt.Errorf("%w: cpu request %v", ErrInvalidSelectRequest, err)
+		}
+	}
+	if o.MemoryRequestHeadroom != nil {
+		if err := domain.ValidateHeadroomPercent(*o.MemoryRequestHeadroom); err != nil {
+			return fmt.Errorf("%w: memory request %v", ErrInvalidSelectRequest, err)
+		}
 	}
 	if o.CPULimit != nil {
 		if err := o.CPULimit.Validate(true); err != nil {
@@ -395,10 +431,14 @@ func (s *Service) findContainer(ctx context.Context, namespace, vpaName, contain
 // resource that isn't configured/eligible for this particular container,
 // only failing if *nothing* requested ends up selectable -- a bulk action
 // must never abort the whole batch over one container.
-func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, opts SelectOptions, strict bool) (domain.PendingSelection, error) {
+//
+// Eligibility is judged against the container's recorded request headroom
+// in doc (the verdict the dashboard showed), while the value written uses
+// the headroom requested in opts.
+func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, cr domain.ContainerRecommendation, doc *domain.StateDocument, opts SelectOptions, strict bool) (domain.PendingSelection, error) {
 	applyCPU, applyMemory := opts.ApplyCPU, opts.ApplyMemory
 
-	eval, err := s.evaluate(ctx, vpa, cr)
+	eval, err := s.evaluate(ctx, vpa, cr, doc.RequestHeadroomFor(vpa.Namespace, vpa.Name, cr.ContainerName))
 	if err != nil {
 		return domain.PendingSelection{}, fmt.Errorf("%w: %v", ErrRecommendationNotFound, err)
 	}
@@ -436,23 +476,44 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		return domain.PendingSelection{}, fmt.Errorf("%w: no requested resource is configured and eligible", ErrRecommendationNotEligible)
 	}
 
-	// A limit spec only travels with the resource it belongs to.
+	// A limit spec and a request headroom only travel with the resource they
+	// belong to. With a headroom, the request written (and so what its limit
+	// is checked against) is the recommendation scaled up, carried as an
+	// override so the patcher, idempotency key and worker all see it.
 	var cpuLimit, memoryLimit *domain.LimitSpec
+	var cpuHeadroom, memoryHeadroom *float64
+	var overrideCPU, overrideMemory *domain.ResourceAmount
 	if wantCPU {
 		cpuLimit = opts.CPULimit
-		if err := checkAbsoluteLimit("cpu", cpuLimit, cr.Target.CPU); err != nil {
+		cpuHeadroom = domain.NonZeroPercent(opts.CPURequestHeadroom)
+		request, err := domain.RequestWithHeadroom(cr.Target.CPU, cpuHeadroom, true)
+		if err != nil {
+			return domain.PendingSelection{}, fmt.Errorf("%w: cpu request %v", ErrInvalidSelectRequest, err)
+		}
+		if cpuHeadroom != nil {
+			overrideCPU = &domain.ResourceAmount{CPU: request}
+		}
+		if err := checkAbsoluteLimit("cpu", cpuLimit, request); err != nil {
 			return domain.PendingSelection{}, err
 		}
-		if err := checkRequiredLimit("cpu", cpuLimit, eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, cr.Target.CPU); err != nil {
+		if err := checkRequiredLimit("cpu", cpuLimit, eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, request); err != nil {
 			return domain.PendingSelection{}, err
 		}
 	}
 	if wantMemory {
 		memoryLimit = opts.MemoryLimit
-		if err := checkAbsoluteLimit("memory", memoryLimit, cr.Target.Memory); err != nil {
+		memoryHeadroom = domain.NonZeroPercent(opts.MemoryRequestHeadroom)
+		request, err := domain.RequestWithHeadroom(cr.Target.Memory, memoryHeadroom, false)
+		if err != nil {
+			return domain.PendingSelection{}, fmt.Errorf("%w: memory request %v", ErrInvalidSelectRequest, err)
+		}
+		if memoryHeadroom != nil {
+			overrideMemory = &domain.ResourceAmount{Memory: request}
+		}
+		if err := checkAbsoluteLimit("memory", memoryLimit, request); err != nil {
 			return domain.PendingSelection{}, err
 		}
-		if err := checkRequiredLimit("memory", memoryLimit, eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, cr.Target.Memory); err != nil {
+		if err := checkRequiredLimit("memory", memoryLimit, eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, request); err != nil {
 			return domain.PendingSelection{}, err
 		}
 	}
@@ -462,6 +523,8 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		Recommendation: cr,
 		ApplyCPU:       wantCPU,
 		ApplyMemory:    wantMemory,
+		OverrideCPU:    overrideCPU,
+		OverrideMemory: overrideMemory,
 		CPULimit:       cpuLimit,
 		MemoryLimit:    memoryLimit,
 	}
@@ -476,8 +539,12 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		ApplyCPU:              wantCPU,
 		ApplyMemory:           wantMemory,
 		RecommendationSummary: cr.Target,
+		OverrideCPU:           overrideCPU,
+		OverrideMemory:        overrideMemory,
 		CPULimit:              cpuLimit,
 		MemoryLimit:           memoryLimit,
+		CPURequestHeadroom:    cpuHeadroom,
+		MemoryRequestHeadroom: memoryHeadroom,
 	}, nil
 }
 
@@ -530,7 +597,12 @@ func (s *Service) SelectRecommendation(ctx context.Context, namespace, vpaName, 
 		return domain.PendingSelection{}, ErrRecommendationNotFound
 	}
 
-	sel, err := s.buildSelection(ctx, vpa, cr, opts, true)
+	doc, _, err := s.State.Get(ctx)
+	if err != nil {
+		return domain.PendingSelection{}, fmt.Errorf("api: read state: %w", err)
+	}
+
+	sel, err := s.buildSelection(ctx, vpa, cr, doc, opts, true)
 	if err != nil {
 		return domain.PendingSelection{}, err
 	}
@@ -554,6 +626,10 @@ func (s *Service) BulkSelectRecommendations(ctx context.Context, opts SelectOpti
 	if err != nil {
 		return BulkSelectResponse{}, fmt.Errorf("api: list opted-in VPAs: %w", err)
 	}
+	doc, _, err := s.State.Get(ctx)
+	if err != nil {
+		return BulkSelectResponse{}, fmt.Errorf("api: read state: %w", err)
+	}
 
 	var result BulkSelectResponse
 	for _, vpa := range vpas {
@@ -569,7 +645,7 @@ func (s *Service) BulkSelectRecommendations(ctx context.Context, opts SelectOpti
 				})
 				continue
 			}
-			sel, err := s.buildSelection(ctx, vpa, cr, opts, false)
+			sel, err := s.buildSelection(ctx, vpa, cr, doc, opts, false)
 			if err != nil {
 				result.Skipped = append(result.Skipped, SkippedSelectionDTO{
 					Namespace: vpa.Namespace, VPAName: vpa.Name, ContainerName: cc.ContainerName,

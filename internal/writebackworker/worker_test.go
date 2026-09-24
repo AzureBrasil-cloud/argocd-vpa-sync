@@ -481,3 +481,93 @@ func TestWorker_ProcessOnce_BatchApplyErrorFailsWholeGroup(t *testing.T) {
 		}
 	}
 }
+
+func seedSelection(t *testing.T, store statestore.StateStore, sel domain.PendingSelection, headrooms map[string]domain.RequestHeadroom) {
+	t.Helper()
+	if err := store.Update(context.Background(), func(doc *domain.StateDocument) error {
+		doc.PendingSelections = append(doc.PendingSelections, sel)
+		doc.RequestHeadrooms = headrooms
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error seeding selection: %v", err)
+	}
+}
+
+func percent(p float64) *float64 { return &p }
+
+func TestWorker_RecordsRequestHeadroomOnlyForAppliedResource(t *testing.T) {
+	store := newStore()
+	sel := testSelection("sha256:headroom-1")
+	sel.CPURequestHeadroom = percent(30)
+	key := domain.RequestHeadroomKey(sel.VPANamespace, sel.VPAName, sel.ContainerName)
+	// Memory was applied earlier with 20%; this cpu-only selection must keep it.
+	seedSelection(t, store, sel, map[string]domain.RequestHeadroom{key: {MemoryPercent: percent(20)}})
+
+	w := newWorker(store, &fakeWriteBackService{result: gitwriteback.WriteBackResult{Status: domain.OperationApplied}})
+	w.processOnce(context.Background())
+
+	doc, _, err := store.Get(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	h := doc.RequestHeadrooms[key]
+	if h.CPUPercent == nil || *h.CPUPercent != 30 {
+		t.Fatalf("expected cpu headroom 30 recorded, got %+v", h.CPUPercent)
+	}
+	if h.MemoryPercent == nil || *h.MemoryPercent != 20 {
+		t.Fatalf("expected memory headroom 20 kept, got %+v", h.MemoryPercent)
+	}
+}
+
+func TestWorker_RecordsRequestHeadroomWhenAlreadyApplied(t *testing.T) {
+	store := newStore()
+	sel := testSelection("sha256:headroom-2")
+	sel.CPURequestHeadroom = percent(30)
+	seedSelection(t, store, sel, nil)
+
+	wb := &fakeBatchWriteBackService{alreadyApplied: map[string]bool{sel.IdempotencyKey: true}}
+	newWorker(store, wb).processOnce(context.Background())
+
+	doc, _, err := store.Get(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	h := doc.RequestHeadrooms[domain.RequestHeadroomKey(sel.VPANamespace, sel.VPAName, sel.ContainerName)]
+	if h.CPUPercent == nil || *h.CPUPercent != 30 {
+		t.Fatalf("expected cpu headroom 30 recorded for an already-applied change, got %+v", h.CPUPercent)
+	}
+}
+
+func TestWorker_DoesNotRecordRequestHeadroomOnFailure(t *testing.T) {
+	store := newStore()
+	sel := testSelection("sha256:headroom-3")
+	sel.CPURequestHeadroom = percent(30)
+	seedSelection(t, store, sel, nil)
+
+	newWorker(store, &fakeWriteBackService{err: errors.New("boom: push failed")}).processOnce(context.Background())
+
+	doc, _, err := store.Get(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(doc.RequestHeadrooms) != 0 {
+		t.Fatalf("expected no headroom recorded for a failed write-back, got %+v", doc.RequestHeadrooms)
+	}
+}
+
+func TestWorker_ApplyingWithoutHeadroomClearsIt(t *testing.T) {
+	store := newStore()
+	sel := testSelection("sha256:headroom-4")
+	key := domain.RequestHeadroomKey(sel.VPANamespace, sel.VPAName, sel.ContainerName)
+	seedSelection(t, store, sel, map[string]domain.RequestHeadroom{key: {CPUPercent: percent(30)}})
+
+	newWorker(store, &fakeWriteBackService{result: gitwriteback.WriteBackResult{Status: domain.OperationApplied}}).processOnce(context.Background())
+
+	doc, _, err := store.Get(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := doc.RequestHeadrooms[key]; ok {
+		t.Fatalf("expected the headroom entry to be removed, got %+v", doc.RequestHeadrooms[key])
+	}
+}

@@ -638,3 +638,130 @@ func TestLimitRequired_NotWithoutLiveLimitOrLimitKeyPath(t *testing.T) {
 		t.Fatalf("expected cpu limit exceeded and memory not, got cpu=%v memory=%v", items[0].CPULimitExceeded, items[0].MemoryLimitExceeded)
 	}
 }
+
+// headroomVPA recommends 100Mi memory for "app", whose live request is set
+// per test.
+func headroomVPA() domain.NormalizedVPA {
+	vpa := sampleVPA()
+	vpa.Containers[0].Target = domain.ResourceAmount{CPU: qptr("250m"), Memory: qptr("100Mi")}
+	return vpa
+}
+
+func seedRequestHeadroom(t *testing.T, svc *Service, memoryPct float64) {
+	t.Helper()
+	if err := svc.State.Update(context.Background(), func(doc *domain.StateDocument) error {
+		doc.RequestHeadrooms = map[string]domain.RequestHeadroom{
+			domain.RequestHeadroomKey("payments", "checkout-api-vpa", "app"): {MemoryPercent: &memoryPct},
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error seeding headroom: %v", err)
+	}
+}
+
+func TestRequestHeadroom_RecordedHeadroomMakesCurrentValueOK(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{headroomVPA()})
+	// 149796572 bytes is 100Mi at 30% headroom (100Mi / 0.7); without the
+	// recorded headroom that would look like a -30% change.
+	svc.WorkloadReader = workloadresources.FakeReader{ByContainer: map[string]domain.ResourceAmount{
+		"app": {CPU: qptr("250m"), Memory: qptr("149796572")},
+	}}
+	seedRequestHeadroom(t, svc, 30)
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	it := items[0]
+	if it.MemoryEligible {
+		t.Fatalf("expected memory not eligible at the recorded headroom, got delta %v", it.DeltaMemoryPercent)
+	}
+	if it.TargetMemory != "149796572" || it.MemoryRequestHeadroomPercent == nil || *it.MemoryRequestHeadroomPercent != 30 {
+		t.Fatalf("unexpected target/headroom: %q %v", it.TargetMemory, it.MemoryRequestHeadroomPercent)
+	}
+}
+
+func TestRequestHeadroom_RecommendationDropStillEligible(t *testing.T) {
+	vpa := headroomVPA()
+	vpa.Containers[0].Target.Memory = qptr("80Mi") // target 80Mi / 0.7 ~ 114Mi, ~-20%
+	svc := newTestService(t, []domain.NormalizedVPA{vpa})
+	svc.WorkloadReader = workloadresources.FakeReader{ByContainer: map[string]domain.ResourceAmount{
+		"app": {CPU: qptr("250m"), Memory: qptr("149796572")},
+	}}
+	seedRequestHeadroom(t, svc, 30)
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !items[0].MemoryEligible {
+		t.Fatalf("expected memory eligible once the recommendation drops, got delta %v", items[0].DeltaMemoryPercent)
+	}
+}
+
+func TestSelectRecommendation_RequestHeadroomOverridesValue(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{headroomVPA()})
+
+	plain, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if plain.OverrideMemory != nil || plain.MemoryRequestHeadroom != nil {
+		t.Fatalf("expected no override without a headroom, got %+v", plain.OverrideMemory)
+	}
+
+	zero := 0.0
+	zeroSel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true, MemoryRequestHeadroom: &zero})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if zeroSel.IdempotencyKey != plain.IdempotencyKey {
+		t.Fatalf("expected a 0%% headroom to keep the idempotency key")
+	}
+
+	pct := 30.0
+	sel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{
+		ApplyMemory:           true,
+		MemoryRequestHeadroom: &pct,
+		CPURequestHeadroom:    &pct, // cpu isn't applied, so this must be dropped
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sel.OverrideMemory == nil || sel.OverrideMemory.Memory.Cmp(resource.MustParse("149796572")) != 0 {
+		t.Fatalf("expected memory override 100Mi / 0.7, got %+v", sel.OverrideMemory)
+	}
+	if sel.MemoryRequestHeadroom == nil || *sel.MemoryRequestHeadroom != 30 || sel.CPURequestHeadroom != nil || sel.OverrideCPU != nil {
+		t.Fatalf("unexpected headroom fields: memory=%v cpu=%v overrideCPU=%v", sel.MemoryRequestHeadroom, sel.CPURequestHeadroom, sel.OverrideCPU)
+	}
+	if sel.IdempotencyKey == plain.IdempotencyKey {
+		t.Fatalf("expected the headroom to change the idempotency key")
+	}
+}
+
+func TestSelectRecommendation_RequiredLimitUsesRequestWithHeadroom(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{headroomVPA()})
+	// 100Mi fits under the 128Mi limit, but 100Mi at 30% (~143Mi) doesn't.
+	svc.WorkloadReader = workloadresources.FakeReader{
+		ByContainer:       defaultWorkloadValues(),
+		LimitsByContainer: map[string]domain.ResourceAmount{"app": {Memory: qptr("128Mi")}},
+	}
+	if _, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true}); err != nil {
+		t.Fatalf("expected no limit required without a headroom, got %v", err)
+	}
+
+	pct := 30.0
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true, MemoryRequestHeadroom: &pct})
+	if !errors.Is(err, ErrInvalidSelectRequest) {
+		t.Fatalf("expected a required limit once the headroom pushes the request above it, got %v", err)
+	}
+}
+
+func TestSelectRecommendation_RejectsInvalidRequestHeadroom(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	pct := 100.0
+	_, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true, CPURequestHeadroom: &pct})
+	if !errors.Is(err, ErrInvalidSelectRequest) {
+		t.Fatalf("expected ErrInvalidSelectRequest, got %v", err)
+	}
+}

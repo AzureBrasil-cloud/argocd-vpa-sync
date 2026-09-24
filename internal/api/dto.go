@@ -38,6 +38,16 @@ type RecommendationDTO struct {
 	CurrentCPU    string `json:"currentCpu,omitempty"`
 	CurrentMemory string `json:"currentMemory,omitempty"`
 
+	// CPURequestHeadroomPercent/MemoryRequestHeadroomPercent are the request
+	// headroom last applied to this container (see domain.RequestHeadroom;
+	// absent means none). TargetCPU/TargetMemory are the recommendation
+	// plus that headroom -- what the live request is compared against, and
+	// what the delta and limit fields below are computed from.
+	CPURequestHeadroomPercent    *float64 `json:"cpuRequestHeadroomPercent,omitempty"`
+	MemoryRequestHeadroomPercent *float64 `json:"memoryRequestHeadroomPercent,omitempty"`
+	TargetCPU                    string   `json:"targetCpu,omitempty"`
+	TargetMemory                 string   `json:"targetMemory,omitempty"`
+
 	// CurrentCPULimit/CurrentMemoryLimit are the live workload's limits
 	// (empty when it declares none). CPULimitConfigured/
 	// MemoryLimitConfigured say whether write-back has a limit key path to
@@ -133,6 +143,13 @@ type SelectRequest struct {
 	// (only if the resource itself is applied). Omitted leaves it untouched.
 	CPULimit    *LimitSpecDTO `json:"cpuLimit,omitempty"`
 	MemoryLimit *LimitSpecDTO `json:"memoryLimit,omitempty"`
+
+	// CPURequestHeadroomPercent / MemoryRequestHeadroomPercent, when set,
+	// write the request as recommendation / (1 - p/100), p in [0, 100), so
+	// the recommendation is (100-p)% of it. Omitted (or 0) writes the bare
+	// recommendation.
+	CPURequestHeadroomPercent    *float64 `json:"cpuRequestHeadroomPercent,omitempty"`
+	MemoryRequestHeadroomPercent *float64 `json:"memoryRequestHeadroomPercent,omitempty"`
 }
 
 // LimitSpecDTO is the wire form of domain.LimitSpec: exactly one of
@@ -168,7 +185,14 @@ func (r SelectRequest) options() (SelectOptions, error) {
 	if err != nil {
 		return SelectOptions{}, fmt.Errorf("%w: memory limit: %v", ErrInvalidSelectRequest, err)
 	}
-	return SelectOptions{ApplyCPU: r.ApplyCPU, ApplyMemory: r.ApplyMemory, CPULimit: cpu, MemoryLimit: memory}, nil
+	return SelectOptions{
+		ApplyCPU:              r.ApplyCPU,
+		ApplyMemory:           r.ApplyMemory,
+		CPULimit:              cpu,
+		MemoryLimit:           memory,
+		CPURequestHeadroom:    r.CPURequestHeadroomPercent,
+		MemoryRequestHeadroom: r.MemoryRequestHeadroomPercent,
+	}, nil
 }
 
 // SkippedSelectionDTO explains why one container was skipped by a bulk

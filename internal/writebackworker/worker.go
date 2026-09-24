@@ -349,6 +349,7 @@ func (w *Worker) recordOutcome(ctx context.Context, sel domain.PendingSelection,
 			op.CommitSHA = result.CommitSHA
 			op.PRURL = result.PRURL
 			op.ErrorMessage = ""
+			recordRequestHeadroom(doc, sel, op.UpdatedAt)
 		case errors.Is(applyErr, gitwriteback.ErrConflict):
 			op.Status = domain.OperationConflict
 			op.ErrorMessage = applyErr.Error()
@@ -375,6 +376,34 @@ func (w *Worker) recordOutcome(ctx context.Context, sel domain.PendingSelection,
 		return
 	}
 	w.logger().Info("writebackworker: applied", append(logAttrs, "branch", result.Branch, "commitSha", result.CommitSHA)...)
+}
+
+// recordRequestHeadroom makes the headroom an applied selection was written
+// with the container's standing one (see domain.RequestHeadroom), for the
+// resources it actually applied only -- the other resource keeps whatever
+// it had. Applying with no headroom clears it, and an entry left with none
+// is removed.
+func recordRequestHeadroom(doc *domain.StateDocument, sel domain.PendingSelection, now time.Time) {
+	if !sel.ApplyCPU && !sel.ApplyMemory {
+		return
+	}
+	key := domain.RequestHeadroomKey(sel.VPANamespace, sel.VPAName, sel.ContainerName)
+	h := doc.RequestHeadrooms[key]
+	if sel.ApplyCPU {
+		h.CPUPercent = domain.NonZeroPercent(sel.CPURequestHeadroom)
+	}
+	if sel.ApplyMemory {
+		h.MemoryPercent = domain.NonZeroPercent(sel.MemoryRequestHeadroom)
+	}
+	if h.CPUPercent == nil && h.MemoryPercent == nil {
+		delete(doc.RequestHeadrooms, key)
+		return
+	}
+	h.UpdatedAt = now
+	if doc.RequestHeadrooms == nil {
+		doc.RequestHeadrooms = map[string]domain.RequestHeadroom{}
+	}
+	doc.RequestHeadrooms[key] = h
 }
 
 func (w *Worker) doApply(ctx context.Context, sel domain.PendingSelection) (gitwriteback.WriteBackResult, error) {

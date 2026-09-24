@@ -32,6 +32,14 @@ export interface RecommendationDTO {
   currentCpu?: string
   currentMemory?: string
 
+  // The request headroom last applied to this container (absent = none),
+  // and the recommendation plus that headroom -- what the live request and
+  // the delta fields are compared against.
+  cpuRequestHeadroomPercent?: number
+  memoryRequestHeadroomPercent?: number
+  targetCpu?: string
+  targetMemory?: string
+
   // Live workload limits (absent when it declares none), and whether
   // write-back has a limit key path to keep in step with the request.
   currentCpuLimit?: string
@@ -112,6 +120,11 @@ export interface SelectRequest {
   // itself is applied). Omitted leaves it untouched.
   cpuLimit?: LimitSpecRequest
   memoryLimit?: LimitSpecRequest
+  // Writes the request as recommendation / (1 - p/100), p in [0, 100), so
+  // the recommendation is (100 - p)% of it. Omitted or 0: the bare
+  // recommendation.
+  cpuRequestHeadroomPercent?: number
+  memoryRequestHeadroomPercent?: number
 }
 
 // Mirrors api.LimitSpecDTO: exactly one of headroomPercent (the new request

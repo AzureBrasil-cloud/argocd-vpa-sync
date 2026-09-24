@@ -1,8 +1,11 @@
 import type { RecommendationDTO } from '../api/types'
-import { formatCPUMilli, formatMemory, formatMemoryBytes, parseCPUMilli, parseK8sQuantityBytes } from '../lib/format'
-import { decideLimit, limitChange, type LimitChange, type LimitResource } from '../lib/limits'
+import { formatCPU, formatCPUMilli, formatMemory, formatMemoryBytes, parseCPUMilli, parseK8sQuantityBytes } from '../lib/format'
+import { FORMAT, type LimitChange, type LimitResource } from '../lib/limits'
+import { planSelection, type ResourcePlan } from '../lib/selectionPlan'
 import type { LimitSettings } from '../lib/useLimitSettings'
+import type { RequestHeadroomSettings } from '../lib/useRequestHeadroom'
 import { LimitSettingsInput, type LimitResourceCounts } from './LimitSettingsInput'
+import { RequestHeadroomInput } from './RequestHeadroomInput'
 
 export interface SelectedRow {
   item: RecommendationDTO
@@ -15,6 +18,7 @@ interface SelectionSummaryProps {
   busy: boolean
   error: string | null
   limits: LimitSettings
+  headroom: RequestHeadroomSettings
   onRemove: (namespace: string, vpaName: string, containerName: string) => void
   onClear: () => void
   onApply: () => void
@@ -43,6 +47,23 @@ export const UNMANAGED_EXCEEDED_TOOLTIP =
   'The new request exceeds the current limit, but the VpaGitOpsBinding sets no limit key path, so ' +
   'write-back cannot raise the limit. Kubernetes rejects a request greater than its limit -- set ' +
   'cpuLimitKeyPath/memoryLimitKeyPath on the binding, or raise the limit in Git by hand.'
+
+/**
+ * "current → proposed" for one resource's request, noting the VPA value and
+ * headroom it came from when a headroom applies.
+ */
+export function RequestBadge({ item, resource, plan }: { item: RecommendationDTO; resource: LimitResource; plan: ResourcePlan }) {
+  const format = resource === 'cpu' ? formatCPU : formatMemory
+  const current = resource === 'cpu' ? item.currentCpu : item.currentMemory
+  const recommended = resource === 'cpu' ? item.recommendedCpu : item.recommendedMemory
+  const next = plan.request === null ? '?' : FORMAT[resource](plan.request)
+  return (
+    <span className="badge badge-muted">
+      {resource === 'cpu' ? 'cpu' : 'mem'} {format(current) || '—'} → {next}
+      {plan.headroom ? ` (VPA ${format(recommended)} +${plan.headroom}%)` : ''}
+    </span>
+  )
+}
 
 export function LimitBadge({ change }: { change: LimitChange | null }) {
   if (!change) return null
@@ -93,6 +114,7 @@ export function SelectionSummary({
   busy,
   error,
   limits,
+  headroom,
   onRemove,
   onClear,
   onApply,
@@ -102,16 +124,14 @@ export function SelectionSummary({
 }: SelectionSummaryProps) {
   if (rows.length === 0) return null
 
-  const decisions = rows.map(({ item, cpu, memory }) => ({
-    cpu: cpu ? decideLimit(item, 'cpu', limits) : null,
-    memory: memory ? decideLimit(item, 'memory', limits) : null,
-  }))
+  const plans = rows.map(({ item, cpu, memory }) => planSelection(item, { cpu, memory }, limits, headroom))
   const resources: LimitResourceCounts[] = (['cpu', 'memory'] as LimitResource[]).map((resource) => ({
     resource,
-    required: decisions.filter((d) => d[resource]?.requirement === 'required').length,
-    optional: decisions.filter((d) => d[resource]?.requirement === 'optional').length,
+    required: plans.filter((p) => p[resource]?.limit.requirement === 'required').length,
+    optional: plans.filter((p) => p[resource]?.limit.requirement === 'optional').length,
   }))
-  const invalidSettings = decisions.some((d) => d.cpu?.invalid || d.memory?.invalid)
+  const selectedResources = (['cpu', 'memory'] as LimitResource[]).filter((r) => rows.some((row) => row[r]))
+  const invalidSettings = plans.some((p) => p.invalid)
 
   let cpuTotals: Totals = { count: 0, current: 0, recommended: 0 }
   let memoryTotals: Totals = { count: 0, current: 0, recommended: 0 }
@@ -121,35 +141,30 @@ export function SelectionSummary({
   let belowRequest = 0
   let unmanagedExceeded = 0
 
-  const limitChanges = rows.map(({ item }, i) => {
-    const { cpu, memory } = decisions[i]
-    const cpuLimit = cpu && !cpu.invalid ? limitChange(item, 'cpu', cpu.parsed) : null
-    const memoryLimit = memory && !memory.invalid ? limitChange(item, 'memory', memory.parsed) : null
-    for (const c of [cpuLimit, memoryLimit]) {
+  plans.forEach(({ cpu, memory }, i) => {
+    for (const c of [cpu?.limitChange, memory?.limitChange]) {
       if (c?.belowRequest) belowRequest++
       else if (c?.unmanagedExceeded) unmanagedExceeded++
       else if (c?.decreases) decreasingLimits++
     }
-    return { cpuLimit, memoryLimit }
-  })
-
-  rows.forEach((row, i) => {
-    if (row.cpu) {
-      cpuTotals = addTotals(cpuTotals, parseCPUMilli(row.item.currentCpu), parseCPUMilli(row.item.recommendedCpu))
-      cpuLimitTotals = addLimitTotals(cpuLimitTotals, limitChanges[i].cpuLimit)
+    const item = rows[i].item
+    if (cpu) {
+      cpuTotals = addTotals(cpuTotals, parseCPUMilli(item.currentCpu), cpu.request)
+      cpuLimitTotals = addLimitTotals(cpuLimitTotals, cpu.limitChange)
     }
-    if (row.memory) {
-      memoryTotals = addTotals(
-        memoryTotals,
-        parseK8sQuantityBytes(row.item.currentMemory ?? ''),
-        parseK8sQuantityBytes(row.item.recommendedMemory ?? ''),
-      )
-      memoryLimitTotals = addLimitTotals(memoryLimitTotals, limitChanges[i].memoryLimit)
+    if (memory) {
+      memoryTotals = addTotals(memoryTotals, parseK8sQuantityBytes(item.currentMemory ?? ''), memory.request)
+      memoryLimitTotals = addLimitTotals(memoryLimitTotals, memory.limitChange)
     }
   })
 
   return (
     <div className={variant === 'full' ? 'selection-summary selection-summary-full' : 'selection-summary'}>
+      {variant === 'full' && onCollapse && (
+        <button className="btn selection-summary-back" onClick={onCollapse}>
+          &larr; Back
+        </button>
+      )}
       <div className="selection-summary-header">
         <div>
           <strong>{rows.length}</strong> container{rows.length === 1 ? '' : 's'} selected
@@ -168,6 +183,7 @@ export function SelectionSummary({
             </span>
           )}
         </div>
+        <RequestHeadroomInput settings={headroom} resources={selectedResources} disabled={busy} />
         <LimitSettingsInput settings={limits} resources={resources} disabled={busy} />
         {belowRequest > 0 && (
           <div className="selection-summary-blocker">
@@ -193,11 +209,6 @@ export function SelectionSummary({
               Expand
             </button>
           )}
-          {variant === 'full' && onCollapse && (
-            <button className="btn btn-small" onClick={onCollapse}>
-              &larr; Back
-            </button>
-          )}
           <button className="btn" disabled={busy} onClick={onClear}>
             Clear
           </button>
@@ -210,28 +221,23 @@ export function SelectionSummary({
       {error && <div className="panel panel-error selection-summary-error">{error}</div>}
 
       <ul className="selection-summary-list">
-        {rows.map(({ item, cpu, memory }, i) => (
+        {rows.map(({ item }, i) => (
           <li key={`${item.namespace}/${item.vpaName}/${item.containerName}`}>
             <span className="selection-summary-item-name">
               {item.namespace}/{item.vpaName} · {item.containerName}
             </span>
             <span className="selection-summary-item-values">
-              {cpu && (
-                <span className="selection-summary-resource">
-                  <span className="badge badge-muted">
-                    cpu {item.currentCpu} → {item.recommendedCpu}
-                  </span>
-                  <LimitBadge change={limitChanges[i].cpuLimit} />
-                </span>
-              )}
-              {memory && (
-                <span className="selection-summary-resource">
-                  <span className="badge badge-muted">
-                    mem {formatMemory(item.currentMemory)} → {formatMemory(item.recommendedMemory)}
-                  </span>
-                  <LimitBadge change={limitChanges[i].memoryLimit} />
-                </span>
-              )}
+              {(['cpu', 'memory'] as const).map((resource) => {
+                const plan = plans[i][resource]
+                return (
+                  plan && (
+                    <span className="selection-summary-resource" key={resource}>
+                      <RequestBadge item={item} resource={resource} plan={plan} />
+                      <LimitBadge change={plan.limitChange} />
+                    </span>
+                  )
+                )
+              })}
             </span>
             <button
               className="selection-summary-remove"

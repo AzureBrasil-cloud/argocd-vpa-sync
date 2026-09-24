@@ -59,11 +59,20 @@ func (s LimitSpec) String() string {
 	return "<none>"
 }
 
-// ValidateLimitHeadroomPercent rejects a headroom outside [0, 100): at 100%
-// the request would have to be 0% of the limit, i.e. an infinite limit.
-func ValidateLimitHeadroomPercent(pct float64) error {
+// ValidateHeadroomPercent rejects a headroom outside [0, 100): at 100% the
+// base value would have to be 0% of the result, i.e. an infinite result.
+func ValidateHeadroomPercent(pct float64) error {
 	if pct != pct || pct < 0 || pct >= 100 {
-		return fmt.Errorf("limit headroom must be >= 0%% and < 100%%, got %v", pct)
+		return fmt.Errorf("headroom must be >= 0%% and < 100%%, got %v", pct)
+	}
+	return nil
+}
+
+// ValidateLimitHeadroomPercent is ValidateHeadroomPercent for a limit's
+// headroom.
+func ValidateLimitHeadroomPercent(pct float64) error {
+	if err := ValidateHeadroomPercent(pct); err != nil {
+		return fmt.Errorf("limit %w", err)
 	}
 	return nil
 }
@@ -89,12 +98,24 @@ func LimitFromRequest(request resource.Quantity, headroomPct float64, isCPU bool
 	if err := ValidateLimitHeadroomPercent(headroomPct); err != nil {
 		return resource.Quantity{}, err
 	}
+	return ScaleForHeadroom(request, headroomPct, isCPU)
+}
+
+// ScaleForHeadroom returns the value for which base is exactly
+// (100-headroomPct)% -- base / (1 - headroomPct/100) -- rounded UP to whole
+// millicores (CPU) or whole bytes (memory). It is the shared arithmetic
+// behind a limit's headroom over its request (LimitFromRequest) and a
+// request's headroom over the VPA recommendation (RequestWithHeadroom).
+func ScaleForHeadroom(base resource.Quantity, headroomPct float64, isCPU bool) (resource.Quantity, error) {
+	if err := ValidateHeadroomPercent(headroomPct); err != nil {
+		return resource.Quantity{}, err
+	}
 
 	// milli * 100 / (100 - pct), in exact rational arithmetic so an exact
 	// ratio (e.g. 305Mi / 0.8) never picks up a float rounding error that
 	// would push the ceiling one unit too high.
 	denom := new(big.Rat).Sub(big.NewRat(100, 1), new(big.Rat).SetFloat64(headroomPct))
-	limitMilli := new(big.Rat).SetInt64(request.MilliValue())
+	limitMilli := new(big.Rat).SetInt64(base.MilliValue())
 	limitMilli.Mul(limitMilli, big.NewRat(100, 1))
 	limitMilli.Quo(limitMilli, denom)
 

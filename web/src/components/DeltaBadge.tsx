@@ -2,12 +2,16 @@ import { formatCPU, formatMemory } from '../lib/format'
 
 interface DeltaBadgeProps {
   current?: string
+  /** What the delta is computed against: the VPA recommendation plus any recorded request headroom. */
   recommended?: string
   percent?: number
   kind: 'cpu' | 'memory'
+  /** The recorded request headroom behind `recommended`, and the bare VPA value it was applied to. */
+  headroomPercent?: number
+  vpa?: string
 }
 
-export function DeltaBadge({ current, recommended, percent, kind }: DeltaBadgeProps) {
+export function DeltaBadge({ current, recommended, percent, kind, headroomPercent, vpa }: DeltaBadgeProps) {
   const format = kind === 'memory' ? formatMemory : formatCPU
 
   if (!current || !recommended) {
@@ -15,8 +19,10 @@ export function DeltaBadge({ current, recommended, percent, kind }: DeltaBadgePr
   }
 
   const currentLabel = format(current)
-  const recommendedLabel = format(recommended)
-  const title = `${current} → ${recommended}`
+  const recommendedLabel = headroomPercent ? `${format(recommended)} (+${headroomPercent}%)` : format(recommended)
+  const title = headroomPercent
+    ? `${current} → ${recommended}: VPA ${vpa ?? '?'} + ${headroomPercent}% request headroom`
+    : `${current} → ${recommended}`
 
   if (percent === undefined) {
     return (

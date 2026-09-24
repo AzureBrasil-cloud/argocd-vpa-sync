@@ -68,6 +68,12 @@ type PendingSelection struct {
 	CPULimit              *LimitSpec      `json:"cpuLimit,omitempty"`
 	MemoryLimit           *LimitSpec      `json:"memoryLimit,omitempty"`
 	CommitMessage         string          `json:"commitMessage,omitempty"`
+
+	// CPURequestHeadroom/MemoryRequestHeadroom are the headroom percentages
+	// OverrideCPU/OverrideMemory were derived with, recorded into
+	// StateDocument.RequestHeadrooms once this selection is applied.
+	CPURequestHeadroom    *float64 `json:"cpuRequestHeadroom,omitempty"`
+	MemoryRequestHeadroom *float64 `json:"memoryRequestHeadroom,omitempty"`
 }
 
 // StateDocument is the entire content of the argocd-vpa-updater-state
@@ -77,6 +83,12 @@ type StateDocument struct {
 	UpdatedAt         time.Time                 `json:"updatedAt"`
 	PendingSelections []PendingSelection        `json:"pendingSelections"`
 	Operations        map[string]OperationState `json:"operations"`
+
+	// RequestHeadrooms holds each container's last applied request headroom
+	// (see RequestHeadroom), keyed by RequestHeadroomKey. Unlike Operations
+	// it is never compacted: it's a standing per-container setting, not
+	// history. Additive, so documents written before it decode as nil.
+	RequestHeadrooms map[string]RequestHeadroom `json:"requestHeadrooms,omitempty"`
 }
 
 // CurrentStateSchemaVersion is the schema version written by this build.

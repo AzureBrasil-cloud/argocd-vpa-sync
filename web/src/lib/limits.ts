@@ -71,9 +71,16 @@ export function parseLimitInput(input: LimitInput, resource: LimitResource): Par
   return value === null ? null : { mode: 'absolute', value, spec: { value: input.raw.trim() } }
 }
 
-export function limitFromRequest(request: number, headroomPercent: number): number {
-  return Math.ceil((request * 100) / (100 - headroomPercent))
+/**
+ * The value for which base is exactly (100 - headroom)%, rounded up to a
+ * whole unit (millicore / byte) -- mirrors domain.ScaleForHeadroom, shared
+ * by a limit's headroom over its request and a request's over the VPA.
+ */
+export function scaleForHeadroom(base: number, headroomPercent: number): number {
+  return Math.ceil((base * 100) / (100 - headroomPercent))
 }
+
+export const limitFromRequest = scaleForHeadroom
 
 export interface LimitChange {
   /** Formatted live limit, or null when the workload declares none. */
@@ -91,41 +98,60 @@ export interface LimitChange {
   reason?: string
 }
 
-const FORMAT: Record<LimitResource, (v: number) => string> = {
+export const FORMAT: Record<LimitResource, (v: number) => string> = {
   cpu: formatCPUMilli,
   memory: formatMemoryBytes,
 }
 
-const PARSE: Record<LimitResource, (raw: string) => number | null> = {
+export const PARSE: Record<LimitResource, (raw: string) => number | null> = {
   cpu: (raw) => parseCPUMilli(raw),
   memory: parseK8sQuantityBytes,
 }
 
 /**
- * Whether selecting a resource must also set its limit: 'required' when the
- * recommendation exceeds the live limit (Kubernetes rejects request > limit),
- * 'optional' when there's a managed limit it fits under, 'none' when no limit
- * can be written (not managed, or the workload declares none).
+ * The request write-back will write for one resource: the VPA
+ * recommendation scaled up by the chosen request headroom (millicores for
+ * CPU, bytes for memory). null when there's no recommendation. Display-only,
+ * like the limit preview: the server derives the committed value itself.
  */
-export type LimitRequirement = 'required' | 'optional' | 'none'
+export function proposedRequest(item: RecommendationDTO, resource: LimitResource, headroomPercent: number | null): number | null {
+  const raw = resource === 'cpu' ? item.recommendedCpu : item.recommendedMemory
+  const recommended = raw ? PARSE[resource](raw) : null
+  if (recommended === null) return null
+  return headroomPercent ? scaleForHeadroom(recommended, headroomPercent) : recommended
+}
 
-export function limitRequirement(item: RecommendationDTO, resource: LimitResource): LimitRequirement {
-  const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
-  const current = resource === 'cpu' ? item.currentCpuLimit : item.currentMemoryLimit
-  if (!configured || !current) return 'none'
-  const required = resource === 'cpu' ? item.cpuLimitRequired : item.memoryLimitRequired
-  return required ? 'required' : 'optional'
+function liveLimit(item: RecommendationDTO, resource: LimitResource): number | null {
+  const raw = resource === 'cpu' ? item.currentCpuLimit : item.currentMemoryLimit
+  return raw ? PARSE[resource](raw) : null
 }
 
 /**
- * The recommendation exceeds the live limit but the binding sets no limit
- * key path for it, so write-back can't raise the limit: the new request
- * would be rejected by Kubernetes. A warning, not a blocker.
+ * Whether selecting a resource must also set its limit: 'required' when the
+ * new request exceeds the live limit (Kubernetes rejects request > limit),
+ * 'optional' when there's a managed limit it fits under, 'none' when no limit
+ * can be written (not managed, or the workload declares none). request is
+ * the proposed request (see proposedRequest), so a request headroom can
+ * make a limit required.
  */
-export function limitExceededUnmanaged(item: RecommendationDTO, resource: LimitResource): boolean {
-  return resource === 'cpu'
-    ? item.cpuLimitExceeded && !item.cpuLimitConfigured
-    : item.memoryLimitExceeded && !item.memoryLimitConfigured
+export type LimitRequirement = 'required' | 'optional' | 'none'
+
+export function limitRequirement(item: RecommendationDTO, resource: LimitResource, request: number | null): LimitRequirement {
+  const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
+  const limit = liveLimit(item, resource)
+  if (!configured || limit === null) return 'none'
+  return request !== null && request > limit ? 'required' : 'optional'
+}
+
+/**
+ * The new request exceeds the live limit but the binding sets no limit key
+ * path for it, so write-back can't raise the limit: the new request would
+ * be rejected by Kubernetes. A warning, not a blocker.
+ */
+export function limitExceededUnmanaged(item: RecommendationDTO, resource: LimitResource, request: number | null): boolean {
+  const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
+  const limit = liveLimit(item, resource)
+  return !configured && limit !== null && request !== null && request > limit
 }
 
 export const LIMIT_KEY_PATH: Record<LimitResource, string> = {
@@ -150,23 +176,29 @@ export function decideLimit(
   item: RecommendationDTO,
   resource: LimitResource,
   settings: { parsed: Record<LimitResource, ParsedLimit | null>; update: Record<LimitResource, boolean> },
+  request: number | null,
 ): LimitDecision {
-  const requirement = limitRequirement(item, resource)
+  const requirement = limitRequirement(item, resource, request)
   const wanted = requirement === 'required' || (requirement === 'optional' && settings.update[resource])
   if (!wanted) return { requirement, parsed: null, invalid: false }
   const parsed = settings.parsed[resource]
   return { requirement, parsed, invalid: parsed === null }
 }
 
-/** limit is what will be written, or null when the limit is left untouched. */
-export function limitChange(item: RecommendationDTO, resource: LimitResource, limit: ParsedLimit | null): LimitChange {
+/**
+ * limit is what will be written, or null when the limit is left untouched;
+ * request is the proposed request it must stay at or above.
+ */
+export function limitChange(
+  item: RecommendationDTO,
+  resource: LimitResource,
+  limit: ParsedLimit | null,
+  request: number | null,
+): LimitChange {
   const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
-  const currentRaw = resource === 'cpu' ? item.currentCpuLimit : item.currentMemoryLimit
-  const recommendedRaw = resource === 'cpu' ? item.recommendedCpu : item.recommendedMemory
-  const parse = PARSE[resource]
   const format = FORMAT[resource]
 
-  const currentValue = currentRaw ? parse(currentRaw) : null
+  const currentValue = liveLimit(item, resource)
   const current = currentValue === null ? null : format(currentValue)
   const none = {
     current,
@@ -178,13 +210,12 @@ export function limitChange(item: RecommendationDTO, resource: LimitResource, li
     unmanagedExceeded: false,
   }
   if (!configured) {
-    return limitExceededUnmanaged(item, resource)
+    return limitExceededUnmanaged(item, resource, request)
       ? { ...none, unmanagedExceeded: true, reason: `below new request, ${LIMIT_KEY_PATH[resource]} not set` }
       : { ...none, reason: 'limit not managed' }
   }
   if (currentValue === null) return { ...none, reason: 'no limit (not created)' }
   if (limit === null) return { ...none, reason: 'unchanged' }
-  const request = recommendedRaw ? parse(recommendedRaw) : null
   if (request === null) return none
 
   const nextValue = limit.mode === 'headroom' ? limitFromRequest(request, limit.percent) : limit.value

@@ -634,6 +634,14 @@ table {
   font-size: 15px;
 }
 
+.selection-summary-back {
+  display: flex;
+  width: fit-content;
+  padding: 3px 10px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
 .selection-summary-full .selection-summary-total {
   font-size: 14px;
 }
