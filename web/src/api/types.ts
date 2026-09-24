@@ -38,6 +38,14 @@ export interface RecommendationDTO {
   currentMemoryLimit?: string
   cpuLimitConfigured: boolean
   memoryLimitConfigured: boolean
+  // The recommendation exceeds the live limit, so selecting that resource
+  // must also set a new limit; otherwise setting one is optional.
+  cpuLimitRequired: boolean
+  memoryLimitRequired: boolean
+  // The recommendation exceeds the live limit, managed or not. Exceeded but
+  // not configured is a warning: write-back can't raise that limit.
+  cpuLimitExceeded: boolean
+  memoryLimitExceeded: boolean
 
   deltaCpuAbsoluteMilli?: number
   deltaCpuPercent?: number

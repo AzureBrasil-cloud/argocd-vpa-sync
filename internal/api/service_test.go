@@ -577,3 +577,64 @@ func TestListRecommendations_ExposesLiveLimits(t *testing.T) {
 		t.Fatalf("unexpected limit fields: %+v", it)
 	}
 }
+
+func TestLimitRequired_WhenRecommendationExceedsLiveLimit(t *testing.T) {
+	// sampleVPA recommends 250m / 512Mi: above a 200m cpu limit, below a 1Gi memory limit.
+	svc := newTestService(t, []domain.NormalizedVPA{sampleVPA()})
+	svc.WorkloadReader = workloadresources.FakeReader{
+		ByContainer:       defaultWorkloadValues(),
+		LimitsByContainer: map[string]domain.ResourceAmount{"app": {CPU: qptr("200m"), Memory: qptr("1Gi")}},
+	}
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !items[0].CPULimitRequired || items[0].MemoryLimitRequired {
+		t.Fatalf("expected cpu limit required and memory optional, got cpu=%v memory=%v", items[0].CPULimitRequired, items[0].MemoryLimitRequired)
+	}
+
+	_, err = svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyCPU: true})
+	if !errors.Is(err, ErrInvalidSelectRequest) {
+		t.Fatalf("expected ErrInvalidSelectRequest for a required cpu limit left unset, got %v", err)
+	}
+
+	pct := 20.0
+	if _, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{
+		ApplyCPU: true,
+		CPULimit: &domain.LimitSpec{HeadroomPercent: &pct},
+	}); err != nil {
+		t.Fatalf("expected a required cpu limit that is set to be accepted, got %v", err)
+	}
+
+	sel, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true})
+	if err != nil {
+		t.Fatalf("expected an optional memory limit to be omittable, got %v", err)
+	}
+	if sel.MemoryLimit != nil {
+		t.Fatalf("expected no memory limit spec, got %+v", sel.MemoryLimit)
+	}
+}
+
+func TestLimitRequired_NotWithoutLiveLimitOrLimitKeyPath(t *testing.T) {
+	vpa := sampleVPA()
+	vpa.Binding.Containers[0].CPULimitKeyPath = ""
+	svc := newTestService(t, []domain.NormalizedVPA{vpa})
+	svc.WorkloadReader = workloadresources.FakeReader{
+		ByContainer:       defaultWorkloadValues(),
+		LimitsByContainer: map[string]domain.ResourceAmount{"app": {CPU: qptr("200m")}},
+	}
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if items[0].CPULimitRequired || items[0].MemoryLimitRequired {
+		t.Fatalf("expected no limit required, got cpu=%v memory=%v", items[0].CPULimitRequired, items[0].MemoryLimitRequired)
+	}
+	// The unmanaged 200m cpu limit is still exceeded by the 250m
+	// recommendation (surfaced as a warning); memory declares no limit.
+	if !items[0].CPULimitExceeded || items[0].MemoryLimitExceeded {
+		t.Fatalf("expected cpu limit exceeded and memory not, got cpu=%v memory=%v", items[0].CPULimitExceeded, items[0].MemoryLimitExceeded)
+	}
+}

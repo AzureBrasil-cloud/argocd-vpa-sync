@@ -1,8 +1,8 @@
 import type { RecommendationDTO } from '../api/types'
 import { formatCPUMilli, formatMemory, formatMemoryBytes, parseCPUMilli, parseK8sQuantityBytes } from '../lib/format'
-import { limitChange, type LimitChange, type LimitResource } from '../lib/limits'
+import { decideLimit, limitChange, type LimitChange, type LimitResource } from '../lib/limits'
 import type { LimitSettings } from '../lib/useLimitSettings'
-import { LimitSettingsInput } from './LimitSettingsInput'
+import { LimitSettingsInput, type LimitResourceCounts } from './LimitSettingsInput'
 
 export interface SelectedRow {
   item: RecommendationDTO
@@ -39,10 +39,26 @@ function addLimitTotals(totals: Totals, change: LimitChange | null): Totals {
   return addTotals(totals, change.currentValue, change.nextValue)
 }
 
+export const UNMANAGED_EXCEEDED_TOOLTIP =
+  'The new request exceeds the current limit, but the VpaGitOpsBinding sets no limit key path, so ' +
+  'write-back cannot raise the limit. Kubernetes rejects a request greater than its limit -- set ' +
+  'cpuLimitKeyPath/memoryLimitKeyPath on the binding, or raise the limit in Git by hand.'
+
 export function LimitBadge({ change }: { change: LimitChange | null }) {
   if (!change) return null
+  if (change.unmanagedExceeded) {
+    return (
+      <span className="badge badge-increase" title={UNMANAGED_EXCEEDED_TOOLTIP}>
+        limit {change.current}: {change.reason} ⚠
+      </span>
+    )
+  }
   if (change.next === null) {
-    return change.reason ? <span className="badge badge-muted">limit: {change.reason}</span> : null
+    return change.reason ? (
+      <span className="badge badge-muted">
+        limit{change.current ? ` ${change.current}` : ''}: {change.reason}
+      </span>
+    ) : null
   }
   if (change.belowRequest) {
     return (
@@ -86,10 +102,16 @@ export function SelectionSummary({
 }: SelectionSummaryProps) {
   if (rows.length === 0) return null
 
-  const resources: LimitResource[] = []
-  if (rows.some((r) => r.cpu)) resources.push('cpu')
-  if (rows.some((r) => r.memory)) resources.push('memory')
-  const invalidSettings = resources.some((r) => limits.parsed[r] === null)
+  const decisions = rows.map(({ item, cpu, memory }) => ({
+    cpu: cpu ? decideLimit(item, 'cpu', limits) : null,
+    memory: memory ? decideLimit(item, 'memory', limits) : null,
+  }))
+  const resources: LimitResourceCounts[] = (['cpu', 'memory'] as LimitResource[]).map((resource) => ({
+    resource,
+    required: decisions.filter((d) => d[resource]?.requirement === 'required').length,
+    optional: decisions.filter((d) => d[resource]?.requirement === 'optional').length,
+  }))
+  const invalidSettings = decisions.some((d) => d.cpu?.invalid || d.memory?.invalid)
 
   let cpuTotals: Totals = { count: 0, current: 0, recommended: 0 }
   let memoryTotals: Totals = { count: 0, current: 0, recommended: 0 }
@@ -97,12 +119,15 @@ export function SelectionSummary({
   let memoryLimitTotals: Totals = { count: 0, current: 0, recommended: 0 }
   let decreasingLimits = 0
   let belowRequest = 0
+  let unmanagedExceeded = 0
 
-  const limitChanges = rows.map(({ item, cpu, memory }) => {
-    const cpuLimit = cpu && limits.parsed.cpu ? limitChange(item, 'cpu', limits.parsed.cpu) : null
-    const memoryLimit = memory && limits.parsed.memory ? limitChange(item, 'memory', limits.parsed.memory) : null
+  const limitChanges = rows.map(({ item }, i) => {
+    const { cpu, memory } = decisions[i]
+    const cpuLimit = cpu && !cpu.invalid ? limitChange(item, 'cpu', cpu.parsed) : null
+    const memoryLimit = memory && !memory.invalid ? limitChange(item, 'memory', memory.parsed) : null
     for (const c of [cpuLimit, memoryLimit]) {
       if (c?.belowRequest) belowRequest++
+      else if (c?.unmanagedExceeded) unmanagedExceeded++
       else if (c?.decreases) decreasingLimits++
     }
     return { cpuLimit, memoryLimit }
@@ -148,6 +173,13 @@ export function SelectionSummary({
           <div className="selection-summary-blocker">
             ✕ {belowRequest} limit{belowRequest === 1 ? ' is' : 's are'} below the new request -- raise the value or
             remove {belowRequest === 1 ? 'that container' : 'those containers'}.
+          </div>
+        )}
+        {unmanagedExceeded > 0 && (
+          <div className="selection-summary-warning" title={UNMANAGED_EXCEEDED_TOOLTIP}>
+            ⚠ {unmanagedExceeded} new request{unmanagedExceeded === 1 ? ' exceeds its' : 's exceed their'} current
+            limit, but the binding sets no limit key path -- write-back can't raise the limit and Kubernetes will
+            reject the change. Set cpuLimitKeyPath/memoryLimitKeyPath on the VpaGitOpsBinding.
           </div>
         )}
         {decreasingLimits > 0 && (

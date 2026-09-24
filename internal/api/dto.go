@@ -47,6 +47,20 @@ type RecommendationDTO struct {
 	CPULimitConfigured    bool   `json:"cpuLimitConfigured"`
 	MemoryLimitConfigured bool   `json:"memoryLimitConfigured"`
 
+	// CPULimitRequired/MemoryLimitRequired say the recommendation exceeds
+	// the live limit, so selecting that resource must also set a new limit
+	// (Kubernetes rejects request > limit). Otherwise setting one is
+	// optional and omitting it leaves the limit untouched.
+	CPULimitRequired    bool `json:"cpuLimitRequired"`
+	MemoryLimitRequired bool `json:"memoryLimitRequired"`
+
+	// CPULimitExceeded/MemoryLimitExceeded say the recommendation exceeds
+	// the live limit, whether or not write-back manages that limit. Exceeded
+	// without a limit key path is a warning: write-back can't raise the
+	// limit, so the new request would be rejected by Kubernetes.
+	CPULimitExceeded    bool `json:"cpuLimitExceeded"`
+	MemoryLimitExceeded bool `json:"memoryLimitExceeded"`
+
 	DeltaCPUAbsoluteMilli    int64    `json:"deltaCpuAbsoluteMilli,omitempty"`
 	DeltaCPUPercent          *float64 `json:"deltaCpuPercent,omitempty"`
 	DeltaMemoryAbsoluteMilli int64    `json:"deltaMemoryAbsoluteMilli,omitempty"`

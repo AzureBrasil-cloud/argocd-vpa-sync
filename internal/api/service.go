@@ -237,6 +237,10 @@ func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 	dto.CurrentMemoryLimit = quantityString(eval.CurrentLimits.Memory)
 	dto.CPULimitConfigured = eval.Target.CPULimitKeyPath != ""
 	dto.MemoryLimitConfigured = eval.Target.MemoryLimitKeyPath != ""
+	dto.CPULimitRequired = limitRequired(eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, cr.Target.CPU)
+	dto.MemoryLimitRequired = limitRequired(eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, cr.Target.Memory)
+	dto.CPULimitExceeded = limitExceeded(eval.CurrentLimits.CPU, cr.Target.CPU)
+	dto.MemoryLimitExceeded = limitExceeded(eval.CurrentLimits.Memory, cr.Target.Memory)
 	dto.DeltaCPUAbsoluteMilli = eval.CPUDelta.AbsoluteMilli
 	dto.DeltaCPUPercent = finitePercent(eval.CPUDelta)
 	dto.DeltaMemoryAbsoluteMilli = eval.MemoryDelta.AbsoluteMilli
@@ -335,6 +339,29 @@ func checkAbsoluteLimit(resourceName string, spec *domain.LimitSpec, recommended
 	return fmt.Errorf("%w: %s limit %s is below the recommended request %s", ErrInvalidSelectRequest, resourceName, spec.Value.String(), recommended.String())
 }
 
+// limitExceeded reports whether writing recommended as the request would
+// exceed the live limit (false when the workload declares none).
+func limitExceeded(currentLimit, recommended *resource.Quantity) bool {
+	return currentLimit != nil && recommended != nil && recommended.Cmp(*currentLimit) > 0
+}
+
+// limitRequired reports whether a new limit must be written alongside the
+// request: it would exceed the live limit, and write-back manages that
+// limit (limitKeyPath set). Exceeding an unmanaged limit can't be fixed by
+// write-back, so it's surfaced as a warning instead (see LimitExceeded).
+func limitRequired(limitKeyPath string, currentLimit, recommended *resource.Quantity) bool {
+	return limitKeyPath != "" && limitExceeded(currentLimit, recommended)
+}
+
+// checkRequiredLimit rejects a selection that would leave the limit
+// untouched below the new request.
+func checkRequiredLimit(resourceName string, spec *domain.LimitSpec, limitKeyPath string, currentLimit, recommended *resource.Quantity) error {
+	if spec != nil || !limitRequired(limitKeyPath, currentLimit, recommended) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s request %s exceeds the current limit %s: a new %s limit is required", ErrInvalidSelectRequest, resourceName, recommended.String(), currentLimit.String(), resourceName)
+}
+
 // findContainer locates the opted-in, valid VPA + container recommendation
 // for (namespace, vpaName, containerName).
 func (s *Service) findContainer(ctx context.Context, namespace, vpaName, containerName string) (domain.NormalizedVPA, domain.ContainerRecommendation, bool, error) {
@@ -416,10 +443,16 @@ func (s *Service) buildSelection(ctx context.Context, vpa domain.NormalizedVPA, 
 		if err := checkAbsoluteLimit("cpu", cpuLimit, cr.Target.CPU); err != nil {
 			return domain.PendingSelection{}, err
 		}
+		if err := checkRequiredLimit("cpu", cpuLimit, eval.Target.CPULimitKeyPath, eval.CurrentLimits.CPU, cr.Target.CPU); err != nil {
+			return domain.PendingSelection{}, err
+		}
 	}
 	if wantMemory {
 		memoryLimit = opts.MemoryLimit
 		if err := checkAbsoluteLimit("memory", memoryLimit, cr.Target.Memory); err != nil {
+			return domain.PendingSelection{}, err
+		}
+		if err := checkRequiredLimit("memory", memoryLimit, eval.Target.MemoryLimitKeyPath, eval.CurrentLimits.Memory, cr.Target.Memory); err != nil {
 			return domain.PendingSelection{}, err
 		}
 	}

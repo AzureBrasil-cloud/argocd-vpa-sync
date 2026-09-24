@@ -3,15 +3,30 @@ import { Link, useParams } from 'react-router-dom'
 import { getRecommendation, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
-import { LimitSettingsInput } from '../components/LimitSettingsInput'
+import { LimitSettingsInput, type LimitResourceCounts } from '../components/LimitSettingsInput'
+import { UNMANAGED_EXCEEDED_TOOLTIP } from '../components/SelectionSummary'
 import { ResourceCheckbox } from '../components/ResourceCheckbox'
 import { StatusBadge } from '../components/StatusBadge'
 import { formatCPU, formatMemory } from '../lib/format'
-import { limitChange, type LimitChange, type LimitResource } from '../lib/limits'
+import {
+  decideLimit,
+  LIMIT_KEY_PATH,
+  limitChange,
+  limitExceededUnmanaged,
+  type LimitChange,
+  type LimitResource,
+} from '../lib/limits'
 import { useLimitSettings } from '../lib/useLimitSettings'
 
 function newLimitCell(change: LimitChange | null) {
   if (!change) return '—'
+  if (change.unmanagedExceeded) {
+    return (
+      <span className="limit-decreases" title={UNMANAGED_EXCEEDED_TOOLTIP}>
+        {change.reason} ⚠
+      </span>
+    )
+  }
   if (change.next === null) return <span className="muted">{change.reason ?? '—'}</span>
   if (change.belowRequest) {
     return (
@@ -72,8 +87,8 @@ export function RecommendationDetail() {
       await selectRecommendation(namespace, vpaName, containerName, {
         applyCPU: selectCPU,
         applyMemory: selectMemory,
-        cpuLimit: selectCPU ? limits.parsed.cpu?.spec : undefined,
-        memoryLimit: selectMemory ? limits.parsed.memory?.spec : undefined,
+        cpuLimit: selectCPU ? cpuDecision?.parsed?.spec : undefined,
+        memoryLimit: selectMemory ? memoryDecision?.parsed?.spec : undefined,
       })
       setSelectCPU(false)
       setSelectMemory(false)
@@ -85,14 +100,30 @@ export function RecommendationDetail() {
     }
   }
 
-  const cpuChange = item && limits.parsed.cpu ? limitChange(item, 'cpu', limits.parsed.cpu) : null
-  const memoryChange = item && limits.parsed.memory ? limitChange(item, 'memory', limits.parsed.memory) : null
+  const cpuDecision = item ? decideLimit(item, 'cpu', limits) : null
+  const memoryDecision = item ? decideLimit(item, 'memory', limits) : null
+  const cpuChange = item && cpuDecision && !cpuDecision.invalid ? limitChange(item, 'cpu', cpuDecision.parsed) : null
+  const memoryChange =
+    item && memoryDecision && !memoryDecision.invalid ? limitChange(item, 'memory', memoryDecision.parsed) : null
   // Settings are shown for both resources so the preview columns are always
   // filled in, but only a resource actually ticked must have a valid one.
-  const limitResources: LimitResource[] = ['cpu', 'memory']
+  const limitResources: LimitResourceCounts[] = [cpuDecision, memoryDecision].flatMap((d, i) =>
+    d
+      ? [
+          {
+            resource: (['cpu', 'memory'] as LimitResource[])[i],
+            required: d.requirement === 'required' ? 1 : 0,
+            optional: d.requirement === 'optional' ? 1 : 0,
+          },
+        ]
+      : [],
+  )
+  const unmanagedExceeded = item
+    ? (['cpu', 'memory'] as LimitResource[]).filter((r) => limitExceededUnmanaged(item, r))
+    : []
   const limitBlocked =
-    (selectCPU && (limits.parsed.cpu === null || cpuChange?.belowRequest === true)) ||
-    (selectMemory && (limits.parsed.memory === null || memoryChange?.belowRequest === true))
+    (selectCPU && (cpuDecision?.invalid === true || cpuChange?.belowRequest === true)) ||
+    (selectMemory && (memoryDecision?.invalid === true || memoryChange?.belowRequest === true))
 
   return (
     <div>
@@ -146,6 +177,24 @@ export function RecommendationDetail() {
               <ul>
                 {item.warnings.map((w) => (
                   <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {unmanagedExceeded.length > 0 && (
+            <div className="panel panel-warning">
+              <strong>Limit below the new request:</strong>
+              <ul>
+                {unmanagedExceeded.map((r) => (
+                  <li key={r}>
+                    {r === 'cpu'
+                      ? `recommended cpu ${formatCPU(item.recommendedCpu)} exceeds the current limit ${formatCPU(item.currentCpuLimit)}`
+                      : `recommended memory ${formatMemory(item.recommendedMemory)} exceeds the current limit ${formatMemory(item.currentMemoryLimit)}`}
+                    , but the VpaGitOpsBinding sets no <code>{LIMIT_KEY_PATH[r]}</code> -- write-back can't raise
+                    the limit, and Kubernetes will reject the new request. Set <code>{LIMIT_KEY_PATH[r]}</code> on the
+                    binding, or raise the limit in Git by hand.
+                  </li>
                 ))}
               </ul>
             </div>
@@ -235,9 +284,10 @@ export function RecommendationDetail() {
           <p className="muted note">
             Tick CPU and/or memory above, then Accept to queue them for this project to write back
             to Git later -- nothing is modified in the VPA, the Deployment, or the cluster directly.
-            Each accepted resource's limit is rewritten too -- by headroom (the new request becomes
-            (100 − headroom)% of the limit) or to an absolute value; a limit the manifest doesn't
-            declare is never added.
+            When the new request exceeds the current limit, a new limit is required and written with
+            it; otherwise the limit is left untouched unless you tick "update". Either way it's set by
+            headroom (the new request becomes (100 − headroom)% of the limit) or to an absolute value;
+            a limit the manifest doesn't declare is never added.
           </p>
         </div>
       )}

@@ -207,12 +207,13 @@ func setQuantityFormatted(root *kyaml.RNode, rawPath string, format func(existin
 // rounding to the file's unit -- so the two can never disagree the way
 // Kubernetes rejects (request > limit), even when the request and limit use
 // different units; or to an absolute value, written as given, which is an
-// error if it's below that request. It is a no-op when spec is nil (limit
-// left alone) or limitPath is empty, and also when the limit key doesn't
-// exist in the file: a container without a limit is already valid, and a
-// limit is never created.
+// error if it's below that request. It is a no-op when limitPath is empty,
+// and also when the limit key doesn't exist in the file: a container
+// without a limit is already valid, and a limit is never created. A nil
+// spec leaves the limit alone, unless the request just written exceeds it
+// -- that is an error rather than a manifest Kubernetes would reject.
 func syncLimit(root *kyaml.RNode, requestPath, limitPath string, spec *domain.LimitSpec, isCPU bool) (bool, error) {
-	if spec == nil || limitPath == "" {
+	if limitPath == "" {
 		return false, nil
 	}
 	if _, err := lookupNode(root, limitPath); err != nil {
@@ -225,6 +226,16 @@ func syncLimit(root *kyaml.RNode, requestPath, limitPath string, spec *domain.Li
 	request, err := lookupQuantity(root, requestPath)
 	if err != nil {
 		return false, err
+	}
+	if spec == nil {
+		current, err := lookupQuantity(root, limitPath)
+		if err != nil {
+			return false, err
+		}
+		if request.Cmp(*current) > 0 {
+			return false, fmt.Errorf("patcher: %s: request %s exceeds the limit %s: a new limit is required", limitPath, request.String(), current.String())
+		}
+		return false, nil
 	}
 	limit, err := spec.Limit(*request, isCPU)
 	if err != nil {

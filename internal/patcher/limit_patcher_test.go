@@ -170,15 +170,28 @@ func TestPatch_LimitHeadroom_NilLeavesLimitsUntouched(t *testing.T) {
 		Target:      deploymentTargetWithLimits(),
 		ApplyMemory: true,
 		Recommendation: domain.ContainerRecommendation{
-			Target: domain.ResourceAmount{Memory: qptr("305Mi")},
+			Target: domain.ResourceAmount{Memory: qptr("280Mi")},
 		},
 	}
 	out, _, err := NewYAMLPatcher().Patch(context.Background(), []byte(monitorSiteYAML), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(string(out), "memory: 300Mi") {
-		t.Fatalf("expected limit to stay 300Mi, got:\n%s", out)
+	if !strings.Contains(string(out), "memory: 280Mi") || !strings.Contains(string(out), "memory: 300Mi") {
+		t.Fatalf("expected request 280Mi and limit to stay 300Mi, got:\n%s", out)
+	}
+}
+
+func TestPatch_NilLimitSpec_RequestAboveLimitIsError(t *testing.T) {
+	req := domain.PatchRequest{
+		Target:      deploymentTargetWithLimits(),
+		ApplyMemory: true,
+		Recommendation: domain.ContainerRecommendation{
+			Target: domain.ResourceAmount{Memory: qptr("305Mi")},
+		},
+	}
+	if _, _, err := NewYAMLPatcher().Patch(context.Background(), []byte(monitorSiteYAML), req); err == nil {
+		t.Fatalf("expected an error for a request above the untouched 300Mi limit")
 	}
 }
 

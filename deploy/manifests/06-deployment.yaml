@@ -18,7 +18,7 @@ spec:
       serviceAccountName: argocd-vpa-updater
       containers:
         - name: argocd-vpa-updater
-          image: docker.io/azurebrasil/argocd-vpa-updater:v1.0.0
+          image: docker.io/azurebrasil/argocd-vpa-updater:v1.1.0
           ports:
             - name: http
               containerPort: 8080

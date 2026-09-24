@@ -85,6 +85,8 @@ export interface LimitChange {
   decreases: boolean
   /** An absolute limit below the new request -- Kubernetes would reject it. */
   belowRequest: boolean
+  /** The live limit is below the new request and not managed (see limitExceededUnmanaged). */
+  unmanagedExceeded: boolean
   /** Why no limit will be written, when next is null. */
   reason?: string
 }
@@ -99,7 +101,65 @@ const PARSE: Record<LimitResource, (raw: string) => number | null> = {
   memory: parseK8sQuantityBytes,
 }
 
-export function limitChange(item: RecommendationDTO, resource: LimitResource, limit: ParsedLimit): LimitChange {
+/**
+ * Whether selecting a resource must also set its limit: 'required' when the
+ * recommendation exceeds the live limit (Kubernetes rejects request > limit),
+ * 'optional' when there's a managed limit it fits under, 'none' when no limit
+ * can be written (not managed, or the workload declares none).
+ */
+export type LimitRequirement = 'required' | 'optional' | 'none'
+
+export function limitRequirement(item: RecommendationDTO, resource: LimitResource): LimitRequirement {
+  const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
+  const current = resource === 'cpu' ? item.currentCpuLimit : item.currentMemoryLimit
+  if (!configured || !current) return 'none'
+  const required = resource === 'cpu' ? item.cpuLimitRequired : item.memoryLimitRequired
+  return required ? 'required' : 'optional'
+}
+
+/**
+ * The recommendation exceeds the live limit but the binding sets no limit
+ * key path for it, so write-back can't raise the limit: the new request
+ * would be rejected by Kubernetes. A warning, not a blocker.
+ */
+export function limitExceededUnmanaged(item: RecommendationDTO, resource: LimitResource): boolean {
+  return resource === 'cpu'
+    ? item.cpuLimitExceeded && !item.cpuLimitConfigured
+    : item.memoryLimitExceeded && !item.memoryLimitConfigured
+}
+
+export const LIMIT_KEY_PATH: Record<LimitResource, string> = {
+  cpu: 'cpuLimitKeyPath',
+  memory: 'memoryLimitKeyPath',
+}
+
+export interface LimitDecision {
+  requirement: LimitRequirement
+  /** The limit to write, or null to leave it untouched. */
+  parsed: ParsedLimit | null
+  /** A limit is to be written but its setting doesn't parse. */
+  invalid: boolean
+}
+
+/**
+ * What write-back does with one container's limit: always set when
+ * required, set when optional only if the user opted in for that resource,
+ * otherwise left untouched.
+ */
+export function decideLimit(
+  item: RecommendationDTO,
+  resource: LimitResource,
+  settings: { parsed: Record<LimitResource, ParsedLimit | null>; update: Record<LimitResource, boolean> },
+): LimitDecision {
+  const requirement = limitRequirement(item, resource)
+  const wanted = requirement === 'required' || (requirement === 'optional' && settings.update[resource])
+  if (!wanted) return { requirement, parsed: null, invalid: false }
+  const parsed = settings.parsed[resource]
+  return { requirement, parsed, invalid: parsed === null }
+}
+
+/** limit is what will be written, or null when the limit is left untouched. */
+export function limitChange(item: RecommendationDTO, resource: LimitResource, limit: ParsedLimit | null): LimitChange {
   const configured = resource === 'cpu' ? item.cpuLimitConfigured : item.memoryLimitConfigured
   const currentRaw = resource === 'cpu' ? item.currentCpuLimit : item.currentMemoryLimit
   const recommendedRaw = resource === 'cpu' ? item.recommendedCpu : item.recommendedMemory
@@ -108,9 +168,22 @@ export function limitChange(item: RecommendationDTO, resource: LimitResource, li
 
   const currentValue = currentRaw ? parse(currentRaw) : null
   const current = currentValue === null ? null : format(currentValue)
-  const none = { current, currentValue, next: null, nextValue: null, decreases: false, belowRequest: false }
-  if (!configured) return { ...none, reason: 'limit not managed' }
+  const none = {
+    current,
+    currentValue,
+    next: null,
+    nextValue: null,
+    decreases: false,
+    belowRequest: false,
+    unmanagedExceeded: false,
+  }
+  if (!configured) {
+    return limitExceededUnmanaged(item, resource)
+      ? { ...none, unmanagedExceeded: true, reason: `below new request, ${LIMIT_KEY_PATH[resource]} not set` }
+      : { ...none, reason: 'limit not managed' }
+  }
   if (currentValue === null) return { ...none, reason: 'no limit (not created)' }
+  if (limit === null) return { ...none, reason: 'unchanged' }
   const request = recommendedRaw ? parse(recommendedRaw) : null
   if (request === null) return none
 
@@ -122,5 +195,6 @@ export function limitChange(item: RecommendationDTO, resource: LimitResource, li
     nextValue,
     decreases: nextValue < currentValue,
     belowRequest: nextValue < request,
+    unmanagedExceeded: false,
   }
 }

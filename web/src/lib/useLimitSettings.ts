@@ -16,6 +16,12 @@ export interface LimitSettings {
   setInput: (resource: LimitResource, input: LimitInput) => void
   /** Each resource's parsed setting, or null while its input is invalid. */
   parsed: Record<LimitResource, ParsedLimit | null>
+  /**
+   * Whether to also write the limit where it's optional (the new request
+   * fits under the current one). A required limit is written regardless.
+   */
+  update: Record<LimitResource, boolean>
+  setUpdate: (resource: LimitResource, update: boolean) => void
 }
 
 const DEFAULT_INPUT: LimitInput = { mode: 'headroom', raw: String(DEFAULT_LIMIT_HEADROOM_PERCENT) }
@@ -41,10 +47,17 @@ function readStored(): LimitInputs {
 /**
  * Per-resource limit settings (headroom % or absolute value). Valid
  * settings are remembered per browser, so the list and detail pages share
- * them.
+ * them. The opt-in to update optional limits is deliberately not
+ * remembered: it starts off on every page, so a limit is never changed
+ * unless it has to be or the user just asked for it.
  */
 export function useLimitSettings(): LimitSettings {
   const [inputs, setInputs] = useState<LimitInputs>(readStored)
+  const [update, setUpdateState] = useState<Record<LimitResource, boolean>>({ cpu: false, memory: false })
+
+  function setUpdate(resource: LimitResource, value: boolean) {
+    setUpdateState((prev) => ({ ...prev, [resource]: value }))
+  }
 
   function setInput(resource: LimitResource, input: LimitInput) {
     setInputs((prev) => {
@@ -66,5 +79,7 @@ export function useLimitSettings(): LimitSettings {
     inputs,
     setInput,
     parsed: { cpu: parseLimitInput(inputs.cpu, 'cpu'), memory: parseLimitInput(inputs.memory, 'memory') },
+    update,
+    setUpdate,
   }
 }

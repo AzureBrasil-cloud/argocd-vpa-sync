@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listRecommendations, selectRecommendation } from "../api/client";
-import type { RecommendationDTO } from "../api/types";
+import type { RecommendationDTO, SelectRequest } from "../api/types";
 import { DeltaBadge } from "../components/DeltaBadge";
 import { EligibilityBadge } from "../components/EligibilityBadge";
 import { RecommendationCard } from "../components/RecommendationCard";
@@ -11,6 +11,7 @@ import {
   type SelectedRow,
 } from "../components/SelectionSummary";
 import { StatusBadge } from "../components/StatusBadge";
+import { decideLimit } from "../lib/limits";
 import { useLimitSettings } from "../lib/useLimitSettings";
 
 type RowKey = string;
@@ -181,12 +182,17 @@ export function RecommendationList() {
     return () => clearInterval(id);
   }, [hasInFlightWriteBack, load]);
 
-  // A resource being applied needs a valid limit setting for it.
-  function limitsValidFor(sel: RowSelection): boolean {
-    return (
-      (!sel.cpu || limits.parsed.cpu !== null) &&
-      (!sel.memory || limits.parsed.memory !== null)
-    );
+  // The limit specs to send for one row's selection: required limits always,
+  // optional ones only when opted in (see decideLimit). null while a limit
+  // that is to be written has an invalid setting.
+  function limitSpecsFor(
+    item: RecommendationDTO,
+    sel: RowSelection,
+  ): Pick<SelectRequest, "cpuLimit" | "memoryLimit"> | null {
+    const cpu = sel.cpu ? decideLimit(item, "cpu", limits) : null;
+    const memory = sel.memory ? decideLimit(item, "memory", limits) : null;
+    if (cpu?.invalid || memory?.invalid) return null;
+    return { cpuLimit: cpu?.parsed?.spec, memoryLimit: memory?.parsed?.spec };
   }
 
   function toggle(key: RowKey, resource: "cpu" | "memory", checked: boolean) {
@@ -200,7 +206,8 @@ export function RecommendationList() {
     const key = rowKey(item);
     const sel = selection[key] ?? EMPTY_SELECTION;
     if (!sel.cpu && !sel.memory) return;
-    if (!limitsValidFor(sel)) {
+    const limitSpecs = limitSpecsFor(item, sel);
+    if (!limitSpecs) {
       setRowError((prev) => ({ ...prev, [key]: "invalid limit setting" }));
       return;
     }
@@ -216,12 +223,7 @@ export function RecommendationList() {
         item.namespace,
         item.vpaName,
         item.containerName,
-        {
-          applyCPU: sel.cpu,
-          applyMemory: sel.memory,
-          cpuLimit: sel.cpu ? limits.parsed.cpu?.spec : undefined,
-          memoryLimit: sel.memory ? limits.parsed.memory?.spec : undefined,
-        },
+        { applyCPU: sel.cpu, applyMemory: sel.memory, ...limitSpecs },
       );
       setSelection((prev) => {
         const next = { ...prev };
@@ -290,25 +292,22 @@ export function RecommendationList() {
     const entries = Object.entries(selection).filter(
       ([, sel]) => sel.cpu || sel.memory,
     );
-    if (entries.length === 0 || !entries.every(([, sel]) => limitsValidFor(sel)))
+    const planned = entries.flatMap(([key, sel]) => {
+      const item = items.find((i) => rowKey(i) === key);
+      return item ? [{ key, sel, item, limitSpecs: limitSpecsFor(item, sel) }] : [];
+    });
+    if (planned.length === 0 || planned.some((p) => p.limitSpecs === null))
       return;
 
     setSummaryBusy(true);
     const failures: string[] = [];
-    for (const [key, sel] of entries) {
-      const item = items.find((i) => rowKey(i) === key);
-      if (!item) continue;
+    for (const { key, sel, item, limitSpecs } of planned) {
       try {
         await selectRecommendation(
           item.namespace,
           item.vpaName,
           item.containerName,
-          {
-            applyCPU: sel.cpu,
-            applyMemory: sel.memory,
-            cpuLimit: sel.cpu ? limits.parsed.cpu?.spec : undefined,
-            memoryLimit: sel.memory ? limits.parsed.memory?.spec : undefined,
-          },
+          { applyCPU: sel.cpu, applyMemory: sel.memory, ...limitSpecs },
         );
         setSelection((prev) => {
           const next = { ...prev };

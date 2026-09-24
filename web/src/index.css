@@ -676,6 +676,13 @@ table {
   font: inherit;
 }
 
+.limit-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .limit-settings-percent {
   width: 56px;
 }
