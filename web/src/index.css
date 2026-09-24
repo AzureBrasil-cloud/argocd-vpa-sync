@@ -446,6 +446,20 @@ table {
   color: var(--muted);
 }
 
+.status-cell {
+  flex-wrap: wrap;
+}
+
+.status-when {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.resource-checkbox-hint {
+  display: inline-flex;
+}
+
 .detail {
   padding: 24px 28px;
 }
@@ -689,6 +703,40 @@ table {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+
+/* Hover/focus tooltip: .hint wraps the trigger, .hint-bubble is the text. */
+.hint {
+  position: relative;
+}
+
+.hint-bubble {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: min(360px, 80vw);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  cursor: default;
+}
+
+.hint-bubble-right {
+  left: auto;
+  right: 0;
+}
+
+.hint:hover .hint-bubble,
+.hint:has(:focus-visible) .hint-bubble {
+  display: block;
 }
 
 .limit-settings-percent {

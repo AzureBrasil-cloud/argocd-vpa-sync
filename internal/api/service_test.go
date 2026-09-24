@@ -765,3 +765,65 @@ func TestSelectRecommendation_RejectsInvalidRequestHeadroom(t *testing.T) {
 		t.Fatalf("expected ErrInvalidSelectRequest, got %v", err)
 	}
 }
+
+// bandVPA recommends 100Mi memory within a 80Mi..120Mi VPA range.
+func bandVPA() domain.NormalizedVPA {
+	vpa := headroomVPA()
+	vpa.Containers[0].LowerBound.Memory = qptr("80Mi")
+	vpa.Containers[0].UpperBound.Memory = qptr("120Mi")
+	return vpa
+}
+
+func TestVPABand_WithinRangeIsNotEligible(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{bandVPA()})
+	// 85Mi is 15% below the 100Mi target (past the 10% threshold) but within 80Mi..120Mi.
+	svc.WorkloadReader = workloadresources.FakeReader{ByContainer: map[string]domain.ResourceAmount{
+		"app": {CPU: qptr("100m"), Memory: qptr("85Mi")},
+	}}
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	it := items[0]
+	if it.MemoryEligible || len(it.MemoryEligibilityReasons) != 1 || it.MemoryEligibilityReasons[0] != "within-vpa-bounds" {
+		t.Fatalf("expected memory ineligible within the VPA range, got %v %v", it.MemoryEligible, it.MemoryEligibilityReasons)
+	}
+	if it.BandLowerMemory != "80Mi" || it.BandUpperMemory != "120Mi" {
+		t.Fatalf("unexpected band: %q..%q", it.BandLowerMemory, it.BandUpperMemory)
+	}
+
+	if _, err := svc.SelectRecommendation(context.Background(), "payments", "checkout-api-vpa", "app", SelectOptions{ApplyMemory: true}); !errors.Is(err, ErrRecommendationNotEligible) {
+		t.Fatalf("expected select to reject a resource within the VPA range, got %v", err)
+	}
+	bulk, err := svc.BulkSelectRecommendations(context.Background(), SelectOptions{ApplyMemory: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(bulk.Selected) != 0 || len(bulk.Skipped) != 1 {
+		t.Fatalf("expected bulk to skip it, got %+v", bulk)
+	}
+}
+
+func TestVPABand_ScaledByRecordedHeadroom(t *testing.T) {
+	svc := newTestService(t, []domain.NormalizedVPA{bandVPA()})
+	// 165Mi is above the bare 80..120Mi range but within it scaled by the
+	// recorded 30% (~114..171Mi), and +15% over the ~143Mi target, so only
+	// the band keeps it ineligible.
+	svc.WorkloadReader = workloadresources.FakeReader{ByContainer: map[string]domain.ResourceAmount{
+		"app": {CPU: qptr("100m"), Memory: qptr("165Mi")},
+	}}
+	seedRequestHeadroom(t, svc, 30)
+
+	items, err := svc.ListRecommendations(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	it := items[0]
+	if it.MemoryEligible || it.MemoryEligibilityReasons[0] != "within-vpa-bounds" {
+		t.Fatalf("expected memory ineligible within the scaled range, got %v %v (band %s..%s)", it.MemoryEligible, it.MemoryEligibilityReasons, it.BandLowerMemory, it.BandUpperMemory)
+	}
+	if it.BandUpperMemory != "179755886" { // 120Mi / 0.7, rounded up
+		t.Fatalf("expected the upper bound scaled by the headroom, got %q", it.BandUpperMemory)
+	}
+}

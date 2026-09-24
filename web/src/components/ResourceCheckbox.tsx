@@ -1,4 +1,5 @@
 import { formatReasons } from '../lib/reasons'
+import { Hint } from './Hint'
 
 interface ResourceCheckboxProps {
   configured: boolean
@@ -21,17 +22,23 @@ export function ResourceCheckbox({ configured, eligible, reasons, checked, onCha
     return <span className="cell-muted resource-checkbox-placeholder">—</span>
   }
 
-  const title = eligible ? undefined : formatReasons(reasons) ?? 'Not eligible'
-
-  return (
+  const checkbox = (
     <input
       type="checkbox"
       className="resource-checkbox"
       checked={checked}
       disabled={!eligible}
-      title={title}
       aria-label={label}
       onChange={(e) => onChange(e.target.checked)}
     />
+  )
+  if (eligible) return checkbox
+
+  // A disabled input gets no mouse events in most browsers, so its own title
+  // never shows: the wrapping Hint is what's hovered.
+  return (
+    <Hint className="resource-checkbox-hint" trigger={checkbox}>
+      Not eligible: {formatReasons(reasons) ?? 'not eligible'}
+    </Hint>
   )
 }

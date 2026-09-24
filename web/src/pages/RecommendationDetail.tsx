@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getRecommendation, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
+import { Hint } from '../components/Hint'
 import { LimitSettingsInput, type LimitResourceCounts } from '../components/LimitSettingsInput'
 import { RequestHeadroomInput } from '../components/RequestHeadroomInput'
 import { UNMANAGED_EXCEEDED_TOOLTIP } from '../components/SelectionSummary'
@@ -30,6 +31,47 @@ function recommendedCell(item: RecommendationDTO, resource: LimitResource) {
         target {format(target)} (+{saved}% saved)
       </div>
     </>
+  )
+}
+
+/**
+ * A VPA bound, plus -- when a recorded request headroom scales it -- the
+ * bound the live request is actually judged against.
+ */
+function boundCell(item: RecommendationDTO, resource: LimitResource, which: 'lower' | 'upper') {
+  const format = resource === 'cpu' ? formatCPU : formatMemory
+  const raw =
+    resource === 'cpu'
+      ? which === 'lower' ? item.lowerBoundCpu : item.upperBoundCpu
+      : which === 'lower' ? item.lowerBoundMemory : item.upperBoundMemory
+  const band =
+    resource === 'cpu'
+      ? which === 'lower' ? item.bandLowerCpu : item.bandUpperCpu
+      : which === 'lower' ? item.bandLowerMemory : item.bandUpperMemory
+  const saved = resource === 'cpu' ? item.cpuRequestHeadroomPercent : item.memoryRequestHeadroomPercent
+  if (!saved || !band) return format(raw) || '—'
+  return (
+    <>
+      {format(raw) || '—'}
+      <div className="muted">
+        {format(band)} (+{saved}%)
+      </div>
+    </>
+  )
+}
+
+const WITHIN_BAND_HINT =
+  "The VPA recommends a range (lower..upper bound), not just a target, and its target keeps moving. While the " +
+  "current request sits inside that range (scaled by the headroom last applied), the workload is sized well " +
+  "enough: changing it again would only chase noise -- the same rule the VPA's own updater uses before " +
+  'restarting a pod. It becomes eligible again once the request falls outside the range.'
+
+function withinBandNote(reasons?: string[]) {
+  if (!reasons?.includes('within-vpa-bounds')) return null
+  return (
+    <Hint className="within-band" trigger={<span className="badge badge-ok">✓ within VPA range</span>}>
+      {WITHIN_BAND_HINT}
+    </Hint>
   )
 }
 
@@ -263,11 +305,13 @@ export function RecommendationDetail() {
                   />
                 </td>
                 <td>CPU</td>
-                <td>{formatCPU(item.currentCpu) || '—'}</td>
+                <td>
+                  {formatCPU(item.currentCpu) || '—'} {withinBandNote(item.cpuEligibilityReasons)}
+                </td>
                 <td>{recommendedCell(item, 'cpu')}</td>
                 <td>{newRequestCell(plans!.cpu, 'cpu')}</td>
-                <td>{formatCPU(item.lowerBoundCpu) || '—'}</td>
-                <td>{formatCPU(item.upperBoundCpu) || '—'}</td>
+                <td>{boundCell(item, 'cpu', 'lower')}</td>
+                <td>{boundCell(item, 'cpu', 'upper')}</td>
                 <td>{formatCPU(item.currentCpuLimit) || '—'}</td>
                 <td>{newLimitCell(plans!.cpu.limitChange)}</td>
               </tr>
@@ -283,11 +327,13 @@ export function RecommendationDetail() {
                   />
                 </td>
                 <td>Memory</td>
-                <td>{formatMemory(item.currentMemory) || '—'}</td>
+                <td>
+                  {formatMemory(item.currentMemory) || '—'} {withinBandNote(item.memoryEligibilityReasons)}
+                </td>
                 <td>{recommendedCell(item, 'memory')}</td>
                 <td>{newRequestCell(plans!.memory, 'memory')}</td>
-                <td>{formatMemory(item.lowerBoundMemory) || '—'}</td>
-                <td>{formatMemory(item.upperBoundMemory) || '—'}</td>
+                <td>{boundCell(item, 'memory', 'lower')}</td>
+                <td>{boundCell(item, 'memory', 'upper')}</td>
                 <td>{formatMemory(item.currentMemoryLimit) || '—'}</td>
                 <td>{newLimitCell(plans!.memory.limitChange)}</td>
               </tr>

@@ -1,8 +1,9 @@
 import { DEFAULT_LIMIT_HEADROOM_PERCENT, LIMIT_VALUE_HINT, type LimitMode, type LimitResource } from '../lib/limits'
 import type { LimitSettings } from '../lib/useLimitSettings'
+import { Hint } from './Hint'
 
 const HEADROOM_TOOLTIP =
-  'Headroom is how much room the limit leaves above the request: the new request becomes ' +
+  'Limit headroom is how much room the limit leaves above the request: the new request becomes ' +
   '(100 − N)% of the limit, i.e. limit = request ÷ (1 − N/100), rounded up. ' +
   'E.g. 20% with a 305Mi request gives a 382Mi limit (the request is 80% of it). ' +
   'Must be ≥ 0 and < 100 -- at 100% the limit would be infinite.'
@@ -60,9 +61,12 @@ export function LimitSettingsInput({ settings, resources, disabled }: LimitSetti
           <div className="limit-settings-row" key={resource}>
             <span className="limit-settings-label">{LABEL[resource]}</span>
             {required > 0 && (
-              <span className="badge badge-increase" title={REQUIRED_TOOLTIP}>
-                required{total > 1 ? ` for ${required} of ${total}` : ''}
-              </span>
+              <Hint
+                className="limit-settings-required"
+                trigger={<span className="badge badge-increase">required{total > 1 ? ` for ${required} of ${total}` : ''}</span>}
+              >
+                {REQUIRED_TOOLTIP}
+              </Hint>
             )}
             {optional > 0 && (
               <label className="limit-settings-toggle">
@@ -98,9 +102,7 @@ export function LimitSettingsInput({ settings, resources, disabled }: LimitSetti
                   onChange={(e) => settings.setInput(resource, { mode: input.mode, raw: e.target.value })}
                 />
                 {input.mode === 'headroom' && <span>%</span>}
-                <span className="limit-settings-info" title={tooltip} aria-label={tooltip} role="img">
-                  ⓘ
-                </span>
+                <Hint align="right">{tooltip}</Hint>
                 {!valid && (
                   <span className="limit-settings-error">
                     {input.mode === 'headroom' ? 'must be ≥ 0 and < 100' : `invalid -- ${LIMIT_VALUE_HINT[resource]}`}

@@ -8,6 +8,7 @@ export const REASON_LABELS: Record<string, string> = {
   'recommendation-below-min-allowed': "below the VPA's minAllowed",
   'recommendation-above-max-allowed': "above the VPA's maxAllowed",
   'no-resource-selected': 'no resource selected',
+  'within-vpa-bounds': "current request is within the VPA's recommended range -- no change needed",
 }
 
 export function formatReasons(reasons?: string[]): string | undefined {

@@ -48,6 +48,15 @@ type RecommendationDTO struct {
 	TargetCPU                    string   `json:"targetCpu,omitempty"`
 	TargetMemory                 string   `json:"targetMemory,omitempty"`
 
+	// BandLower*/BandUpper* are the VPA's lower/upper bounds with that same
+	// headroom: a live request within them is not eligible (reason
+	// within-vpa-bounds) however far the target has moved, so the dashboard
+	// doesn't invite a new write-back on every recommendation wobble.
+	BandLowerCPU    string `json:"bandLowerCpu,omitempty"`
+	BandUpperCPU    string `json:"bandUpperCpu,omitempty"`
+	BandLowerMemory string `json:"bandLowerMemory,omitempty"`
+	BandUpperMemory string `json:"bandUpperMemory,omitempty"`
+
 	// CurrentCPULimit/CurrentMemoryLimit are the live workload's limits
 	// (empty when it declares none). CPULimitConfigured/
 	// MemoryLimitConfigured say whether write-back has a limit key path to

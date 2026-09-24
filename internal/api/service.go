@@ -237,6 +237,10 @@ func (s *Service) buildDTO(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 
 	dto.TargetCPU = quantityString(eval.Desired.CPU)
 	dto.TargetMemory = quantityString(eval.Desired.Memory)
+	dto.BandLowerCPU = quantityString(eval.CPUBand.Lower)
+	dto.BandUpperCPU = quantityString(eval.CPUBand.Upper)
+	dto.BandLowerMemory = quantityString(eval.MemoryBand.Lower)
+	dto.BandUpperMemory = quantityString(eval.MemoryBand.Upper)
 
 	dto.CurrentCPU = quantityString(eval.Current.CPU)
 	dto.CurrentMemory = quantityString(eval.Current.Memory)
@@ -276,7 +280,11 @@ type evaluation struct {
 	CurrentLimits domain.ResourceAmount
 	// Desired is the VPA recommendation plus the container's recorded
 	// request headroom -- what the live request is compared against.
-	Desired     domain.ResourceAmount
+	Desired domain.ResourceAmount
+	// CPUBand/MemoryBand are the VPA's lower..upper bounds with the same
+	// headroom: a live request inside them isn't eligible.
+	CPUBand     eligibility.Band
+	MemoryBand  eligibility.Band
 	CPUDelta    eligibility.Delta
 	MemoryDelta eligibility.Delta
 	Eligibility eligibility.Result
@@ -310,6 +318,13 @@ func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 		return eval, fmt.Errorf("recorded memory request headroom: %w", err)
 	}
 
+	if eval.CPUBand, err = bandWithHeadroom(cr.LowerBound.CPU, cr.UpperBound.CPU, headroom.CPUPercent, true); err != nil {
+		return eval, fmt.Errorf("recorded cpu request headroom: %w", err)
+	}
+	if eval.MemoryBand, err = bandWithHeadroom(cr.LowerBound.Memory, cr.UpperBound.Memory, headroom.MemoryPercent, false); err != nil {
+		return eval, fmt.Errorf("recorded memory request headroom: %w", err)
+	}
+
 	eval.CPUDelta = eligibility.ComputeDelta(current.CPU, eval.Desired.CPU)
 	eval.MemoryDelta = eligibility.ComputeDelta(current.Memory, eval.Desired.Memory)
 	eval.Eligibility = eligibility.Evaluate(eligibility.Input{
@@ -318,9 +333,26 @@ func (s *Service) evaluate(ctx context.Context, vpa domain.NormalizedVPA, cr dom
 		ApplyCPU:         target.CPUKeyPath != "",
 		ApplyMemory:      target.MemoryKeyPath != "",
 		MinChangePercent: vpa.Binding.EffectiveMinChangePercent(cr.ContainerName),
+		CPUBand:          eval.CPUBand,
+		MemoryBand:       eval.MemoryBand,
 	})
 
 	return eval, nil
+}
+
+// bandWithHeadroom is the VPA's lowerBound..upperBound scaled by the same
+// recorded request headroom as its target, so a container carrying that
+// headroom is judged against the range it was meant to land in.
+func bandWithHeadroom(lower, upper *resource.Quantity, headroomPct *float64, isCPU bool) (eligibility.Band, error) {
+	l, err := domain.RequestWithHeadroom(lower, headroomPct, isCPU)
+	if err != nil {
+		return eligibility.Band{}, err
+	}
+	u, err := domain.RequestWithHeadroom(upper, headroomPct, isCPU)
+	if err != nil {
+		return eligibility.Band{}, err
+	}
+	return eligibility.Band{Lower: l, Upper: u}, nil
 }
 
 // SelectOptions is what a caller asks a selection to apply: which

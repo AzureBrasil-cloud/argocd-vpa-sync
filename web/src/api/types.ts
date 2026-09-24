@@ -39,6 +39,12 @@ export interface RecommendationDTO {
   memoryRequestHeadroomPercent?: number
   targetCpu?: string
   targetMemory?: string
+  // The VPA's lower/upper bounds with that same headroom: a live request
+  // within them isn't eligible (reason within-vpa-bounds).
+  bandLowerCpu?: string
+  bandUpperCpu?: string
+  bandLowerMemory?: string
+  bandUpperMemory?: string
 
   // Live workload limits (absent when it declares none), and whether
   // write-back has a limit key path to keep in step with the request.

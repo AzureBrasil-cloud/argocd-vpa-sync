@@ -104,7 +104,27 @@ const (
 	ReasonBelowMinAllowed    = "recommendation-below-min-allowed"
 	ReasonAboveMaxAllowed    = "recommendation-above-max-allowed"
 	ReasonNoResourceSelected = "no-resource-selected"
+	ReasonWithinVPABounds    = "within-vpa-bounds"
 )
+
+// Band is the range the VPA itself considers acceptable for a request --
+// its lowerBound..upperBound, scaled by any recorded request headroom. A
+// live request inside it needs no change, however far the (constantly
+// shifting) target has moved: the same hysteresis the VPA updater applies
+// before evicting a pod, and what keeps the dashboard from inviting a new
+// write-back every time the recommendation wobbles. A band missing either
+// side is ignored.
+type Band struct {
+	Lower, Upper *resource.Quantity
+}
+
+// Contains reports whether q lies within a complete band, inclusive.
+func (b Band) Contains(q *resource.Quantity) bool {
+	if b.Lower == nil || b.Upper == nil || q == nil {
+		return false
+	}
+	return q.Cmp(*b.Lower) >= 0 && q.Cmp(*b.Upper) <= 0
+}
 
 // Input bundles everything needed to decide eligibility for one container's
 // CPU and/or memory recommendation.
@@ -124,6 +144,10 @@ type Input struct {
 	// the VPA itself would not consider it a valid recommendation.
 	CPUMinAllowed, CPUMaxAllowed       *resource.Quantity
 	MemoryMinAllowed, MemoryMaxAllowed *resource.Quantity
+
+	// CPUBand/MemoryBand: a live request within them is not eligible (see
+	// Band), on top of MinChangePercent.
+	CPUBand, MemoryBand Band
 }
 
 // ResourceEligibility is the per-resource breakdown of an eligibility
@@ -169,7 +193,7 @@ func Evaluate(in Input) Result {
 	result := Result{}
 
 	if in.ApplyCPU {
-		ok, r := evaluateOne(in.CPU, in.MinChangePercent, in.CPUMinAllowed, in.CPUMaxAllowed)
+		ok, r := evaluateOne(in.CPU, in.MinChangePercent, in.CPUMinAllowed, in.CPUMaxAllowed, in.CPUBand)
 		result.CPU = ResourceEligibility{Requested: true, Eligible: ok, Reasons: r}
 		if ok {
 			eligible = true
@@ -178,7 +202,7 @@ func Evaluate(in Input) Result {
 		}
 	}
 	if in.ApplyMemory {
-		ok, r := evaluateOne(in.Memory, in.MinChangePercent, in.MemoryMinAllowed, in.MemoryMaxAllowed)
+		ok, r := evaluateOne(in.Memory, in.MinChangePercent, in.MemoryMinAllowed, in.MemoryMaxAllowed, in.MemoryBand)
 		result.Memory = ResourceEligibility{Requested: true, Eligible: ok, Reasons: r}
 		if ok {
 			eligible = true
@@ -194,7 +218,7 @@ func Evaluate(in Input) Result {
 	return result
 }
 
-func evaluateOne(d Delta, minChangePercent float64, minAllowed, maxAllowed *resource.Quantity) (bool, []string) {
+func evaluateOne(d Delta, minChangePercent float64, minAllowed, maxAllowed *resource.Quantity, band Band) (bool, []string) {
 	if !d.HasCurrent {
 		return false, []string{ReasonNoCurrentValue}
 	}
@@ -209,6 +233,9 @@ func evaluateOne(d Delta, minChangePercent float64, minAllowed, maxAllowed *reso
 	}
 	if !d.MeetsThreshold(minChangePercent) {
 		return false, []string{ReasonBelowThreshold}
+	}
+	if band.Contains(d.Current) {
+		return false, []string{ReasonWithinVPABounds}
 	}
 	return true, nil
 }

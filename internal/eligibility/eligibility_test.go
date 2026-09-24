@@ -221,3 +221,53 @@ func TestEvaluate_PerResourceBreakdown_NotRequestedLeavesZeroValue(t *testing.T)
 		t.Fatalf("expected Memory.Requested=false when ApplyMemory was false")
 	}
 }
+
+func TestEvaluate_WithinVPABandIsNotEligible(t *testing.T) {
+	// 300Mi is 25% below the 400Mi target -- well past the 10% threshold --
+	// but inside the VPA's own 250Mi..500Mi range.
+	res := Evaluate(Input{
+		Memory:           ComputeDelta(qty("300Mi"), qty("400Mi")),
+		ApplyMemory:      true,
+		MinChangePercent: 10,
+		MemoryBand:       Band{Lower: qty("250Mi"), Upper: qty("500Mi")},
+	})
+	if res.Memory.Eligible || len(res.Memory.Reasons) != 1 || res.Memory.Reasons[0] != ReasonWithinVPABounds {
+		t.Fatalf("expected ineligible with %q, got %+v", ReasonWithinVPABounds, res.Memory)
+	}
+}
+
+func TestEvaluate_OutsideVPABand(t *testing.T) {
+	band := Band{Lower: qty("250Mi"), Upper: qty("500Mi")}
+	res := Evaluate(Input{
+		Memory:           ComputeDelta(qty("200Mi"), qty("400Mi")),
+		ApplyMemory:      true,
+		MinChangePercent: 10,
+		MemoryBand:       band,
+	})
+	if !res.Memory.Eligible {
+		t.Fatalf("expected eligible below the band, got %+v", res.Memory)
+	}
+
+	// Outside the band but under the threshold: the threshold still applies.
+	res = Evaluate(Input{
+		Memory:           ComputeDelta(qty("520Mi"), qty("500Mi")),
+		ApplyMemory:      true,
+		MinChangePercent: 10,
+		MemoryBand:       band,
+	})
+	if res.Memory.Eligible || res.Memory.Reasons[0] != ReasonBelowThreshold {
+		t.Fatalf("expected %q, got %+v", ReasonBelowThreshold, res.Memory)
+	}
+}
+
+func TestEvaluate_IncompleteVPABandIsIgnored(t *testing.T) {
+	res := Evaluate(Input{
+		CPU:              ComputeDelta(qty("300m"), qty("400m")),
+		ApplyCPU:         true,
+		MinChangePercent: 10,
+		CPUBand:          Band{Lower: qty("250m")},
+	})
+	if !res.CPU.Eligible {
+		t.Fatalf("expected a band missing its upper bound to be ignored, got %+v", res.CPU)
+	}
+}
