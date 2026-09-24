@@ -456,8 +456,13 @@ table {
   white-space: nowrap;
 }
 
-.resource-checkbox-hint {
+.resource-checkbox-hint,
+.delta-hint {
   display: inline-flex;
+}
+
+.delta-hint {
+  cursor: help;
 }
 
 .detail {
@@ -705,18 +710,14 @@ table {
   cursor: pointer;
 }
 
-/* Hover/focus tooltip: .hint wraps the trigger, .hint-bubble is the text. */
-.hint {
-  position: relative;
-}
-
+/* Hover/focus tooltip (components/Hint.tsx): .hint wraps the trigger; the
+   .hint-bubble is portaled to <body> and placed with fixed coordinates, so
+   no overflow container clips it. */
 .hint-bubble {
-  display: none;
-  position: absolute;
-  left: 0;
-  top: calc(100% + 6px);
-  z-index: 20;
-  width: min(360px, 80vw);
+  position: fixed;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 16px));
+  pointer-events: none;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -726,17 +727,6 @@ table {
   font-weight: 400;
   line-height: 1.45;
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
-  cursor: default;
-}
-
-.hint-bubble-right {
-  left: auto;
-  right: 0;
-}
-
-.hint:hover .hint-bubble,
-.hint:has(:focus-visible) .hint-bubble {
-  display: block;
 }
 
 .limit-settings-percent {

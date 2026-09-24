@@ -1,11 +1,12 @@
 import type { LimitResource } from '../lib/limits'
 import type { RequestHeadroomSettings } from '../lib/useRequestHeadroom'
+import { Hint } from './Hint'
 
 const LABEL: Record<LimitResource, string> = { cpu: 'CPU request headroom', memory: 'Memory request headroom' }
 
 function Tooltip() {
   return (
-    <span className="hint-bubble" role="tooltip">
+    <>
       <strong>Why?</strong> The VPA recommends what the pod actually uses. Written as-is, the request equals that
       usage, so a pod merely at rest already runs at ~100% of its request -- and an HPA, which scales on a
       percentage of the request, scales it out for no reason.
@@ -18,7 +19,7 @@ function Tooltip() {
       Once applied, the headroom is remembered for the container and later recommendations are compared against
       recommendation + headroom, so it isn't offered a change back down. Unticked, the bare recommendation is
       written (clearing any remembered headroom).
-    </span>
+    </>
   )
 }
 
@@ -43,19 +44,26 @@ export function RequestHeadroomInput({ settings, resources, disabled }: RequestH
         const valid = settings.parsed[resource] !== null
         return (
           <div className="limit-settings-row" key={resource}>
-            <label className="limit-settings-toggle limit-settings-label hint">
-              <input
-                type="checkbox"
-                checked={enabled}
-                disabled={disabled}
-                onChange={(e) => settings.setEnabled(resource, e.target.checked)}
-              />
-              {LABEL[resource]}
-              <span className="limit-settings-info" aria-hidden="true">
-                ⓘ
-              </span>
+            <Hint
+              className="limit-settings-label"
+              focusable={false}
+              trigger={
+                <label className="limit-settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    disabled={disabled}
+                    onChange={(e) => settings.setEnabled(resource, e.target.checked)}
+                  />
+                  {LABEL[resource]}
+                  <span className="limit-settings-info" aria-hidden="true">
+                    ⓘ
+                  </span>
+                </label>
+              }
+            >
               <Tooltip />
-            </label>
+            </Hint>
             {enabled ? (
               <>
                 <input

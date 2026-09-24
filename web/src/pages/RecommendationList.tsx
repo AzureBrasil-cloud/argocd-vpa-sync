@@ -512,7 +512,7 @@ export function RecommendationList() {
                         <DeltaBadge
                           kind="cpu"
                           current={item.currentCpu}
-                          recommended={item.targetCpu ?? item.recommendedCpu} vpa={item.recommendedCpu} headroomPercent={item.cpuRequestHeadroomPercent}
+                          recommended={item.targetCpu ?? item.recommendedCpu} vpa={item.recommendedCpu} headroomPercent={item.cpuRequestHeadroomPercent} eligible={item.cpuConfigured && item.cpuEligible} reasons={item.cpuEligibilityReasons}
                           percent={item.deltaCpuPercent}
                         />
                       </div>
@@ -530,7 +530,7 @@ export function RecommendationList() {
                         <DeltaBadge
                           kind="memory"
                           current={item.currentMemory}
-                          recommended={item.targetMemory ?? item.recommendedMemory} vpa={item.recommendedMemory} headroomPercent={item.memoryRequestHeadroomPercent}
+                          recommended={item.targetMemory ?? item.recommendedMemory} vpa={item.recommendedMemory} headroomPercent={item.memoryRequestHeadroomPercent} eligible={item.memoryConfigured && item.memoryEligible} reasons={item.memoryEligibilityReasons}
                           percent={item.deltaMemoryPercent}
                         />
                       </div>
