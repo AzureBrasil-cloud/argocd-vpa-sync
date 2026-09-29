@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 
+# Multi-arch: both build stages run natively on the build host
+# ($BUILDPLATFORM) and cross-compile for $TARGETPLATFORM, so only the small
+# runtime stage goes through emulation.
+
 # --- frontend build stage -------------------------------------------------
-FROM node:22-alpine AS webbuilder
+# Its output (static assets) is platform-independent.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS webbuilder
 WORKDIR /web
 
 COPY web/package.json web/package-lock.json ./
@@ -11,7 +16,7 @@ COPY web/ .
 RUN npm run build
 
 # --- build stage -----------------------------------------------------------
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 WORKDIR /src
 
 RUN apk add --no-cache git ca-certificates
@@ -25,6 +30,8 @@ COPY internal/ internal/
 COPY web/embed_dist.go web/embed_stub.go web/
 COPY --from=webbuilder /web/dist web/dist
 
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
@@ -32,7 +39,7 @@ ARG BUILD_DATE=unknown
 # -tags dist embeds the dashboard build (web/dist, copied above) into the
 # binary via web/embed_dist.go; see that file's doc comment for why plain
 # `go build` (no tags) intentionally does not require it.
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
     -tags dist \
     -trimpath \
     -ldflags "-s -w \

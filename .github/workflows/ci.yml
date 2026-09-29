@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal web)" || (gofmt -l cmd internal web; exit 1)
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build ./...
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # Typechecks (tsc -b) and bundles.
+      - run: npm run build
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/argocd-vpa-sync
+      - name: helm template (every auth mode)
+        run: |
+          chart=deploy/helm/argocd-vpa-sync
+          helm template t $chart >/dev/null
+          helm template t $chart --set 'auth.admin.passwordHash=$2a$10$abcdefghijklmnopqrstuv' --set auth.sessionSigningKey=0123456789abcdef0123456789abcdef >/dev/null
+          helm template t $chart --set auth.existingSecret=my-auth >/dev/null
+          helm template t $chart --set auth.enabled=false --set ingress.enabled=true --set networkPolicy.enabled=true --set ssh.extraKnownHosts='github.com ssh-ed25519 AAAA' >/dev/null
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
