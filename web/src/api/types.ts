@@ -98,7 +98,6 @@ export interface RecommendationDTO {
 export interface OperationDTO {
   branch?: string
   commitSha?: string
-  prUrl?: string
   errorMessage?: string
   updatedAt: string
 }

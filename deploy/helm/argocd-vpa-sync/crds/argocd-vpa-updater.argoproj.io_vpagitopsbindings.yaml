@@ -112,7 +112,6 @@ spec:
                         rest of the module, matching the discipline internal/vpaapi follows.
                       enum:
                       - helm-values
-                      - kustomize-patch
                       - yaml
                       type: string
                     memoryKeyPath:
@@ -167,11 +166,11 @@ spec:
               writeBackPolicy:
                 default: commit
                 description: |-
-                  WriteBackPolicy identifies whether a write-back should land as a direct
-                  commit or go through a pull/merge request.
+                  WriteBackPolicy identifies how a write-back lands in Git. "commit" (a
+                  direct commit and push to RepoBranch) is the only one; the field is kept
+                  so bindings that set it explicitly stay valid.
                 enum:
                 - commit
-                - pull-request
                 type: string
             required:
             - containers

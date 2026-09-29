@@ -325,27 +325,6 @@ func TestRunner_Push_NonFastForward(t *testing.T) {
 	}
 }
 
-func TestRunner_CheckoutNewBranch(t *testing.T) {
-	remote := gittest.NewBareRepoWithInitialCommit(t, map[string]string{"f.txt": "a\n"})
-	dir := cloneInto(t, remote, gittest.DefaultBranch)
-	r := NewRunner()
-
-	if err := r.CheckoutNewBranch(context.Background(), dir, "vpa-updater/app-abc123"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := r.Push(context.Background(), dir, remote, "vpa-updater/app-abc123", "vpa-updater/app-abc123", noAuth()); err != nil {
-		t.Fatalf("unexpected error pushing new topic branch: %v", err)
-	}
-
-	exists, err := r.RemoteBranchExists(context.Background(), remote, "vpa-updater/app-abc123", noAuth())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !exists {
-		t.Fatalf("expected the new topic branch to exist on the remote after push")
-	}
-}
-
 func TestPrepareCredentials_CleanupRemovesTempDir(t *testing.T) {
 	r := NewRunner()
 	env, cleanup, err := r.prepareCredentials(domain.GitCredentials{AuthMethod: domain.AuthNone})

@@ -11,18 +11,17 @@ import (
 type SourceType string
 
 const (
-	SourceTypeHelmValues     SourceType = "helm-values"
-	SourceTypeKustomizePatch SourceType = "kustomize-patch"
-	SourceTypeYAML           SourceType = "yaml"
+	SourceTypeHelmValues SourceType = "helm-values"
+	SourceTypeYAML       SourceType = "yaml"
 )
 
-// WriteBackPolicy identifies whether a write-back should land as a direct
-// commit or go through a pull/merge request.
+// WriteBackPolicy identifies how a write-back lands in Git. "commit" (a
+// direct commit and push to RepoBranch) is the only one; the field is kept
+// so bindings that set it explicitly stay valid.
 type WriteBackPolicy string
 
 const (
-	WriteBackCommit      WriteBackPolicy = "commit"
-	WriteBackPullRequest WriteBackPolicy = "pull-request"
+	WriteBackCommit WriteBackPolicy = "commit"
 )
 
 // Ready condition reasons, surfaced via status.conditions.
@@ -68,7 +67,7 @@ type ContainerWriteBackConfig struct {
 	Name string `json:"name"`
 
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=helm-values;kustomize-patch;yaml
+	// +kubebuilder:validation:Enum=helm-values;yaml
 	ManifestType SourceType `json:"manifestType"`
 
 	// +kubebuilder:validation:Required
@@ -121,7 +120,7 @@ type VpaGitOpsBindingSpec struct {
 	RepoBranch string `json:"repoBranch"`
 
 	// +optional
-	// +kubebuilder:validation:Enum=commit;pull-request
+	// +kubebuilder:validation:Enum=commit
 	// +kubebuilder:default=commit
 	WriteBackPolicy WriteBackPolicy `json:"writeBackPolicy,omitempty"`
 

@@ -5,18 +5,16 @@ package domain
 type SourceType string
 
 const (
-	SourceTypeHelmValues     SourceType = "helm-values"
-	SourceTypeKustomizePatch SourceType = "kustomize-patch"
-	SourceTypeYAML           SourceType = "yaml"
+	SourceTypeHelmValues SourceType = "helm-values"
+	SourceTypeYAML       SourceType = "yaml"
 )
 
-// WriteBackPolicy identifies whether a write-back should land as a direct
-// commit or go through a pull/merge request.
+// WriteBackPolicy identifies how a write-back lands in Git: always a direct
+// commit and push to the binding's branch.
 type WriteBackPolicy string
 
 const (
-	WriteBackCommit      WriteBackPolicy = "commit"
-	WriteBackPullRequest WriteBackPolicy = "pull-request"
+	WriteBackCommit WriteBackPolicy = "commit"
 )
 
 // DefaultMinChangePercent is used when neither a binding nor a container

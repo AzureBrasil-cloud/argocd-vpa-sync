@@ -29,7 +29,6 @@ type OperationState struct {
 
 	Branch    string `json:"branch,omitempty"`
 	CommitSHA string `json:"commitSha,omitempty"`
-	PRURL     string `json:"prUrl,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

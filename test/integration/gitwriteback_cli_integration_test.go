@@ -9,7 +9,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 
-	"github.com/azurebrasil/argocd-vpa-updater/internal/domain"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/gitexec"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/gittest"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/gitwriteback"
@@ -169,10 +168,9 @@ func TestGitWriteBackCLI_FullFlow(t *testing.T) {
 
 // TestGitWriteBackCLI_IdempotencyScanFindsNonTipCommit is a regression test
 // for CLIGitWriteBackService's use of CloneFull (full history) rather than
-// Clone (shallow, --depth 1) when resuming an existing working branch: it
-// pushes two different idempotency-keyed commits onto the same pull-request
-// topic branch, then replays the *first* one (no longer the branch tip) and
-// asserts it's still found. A regression to a shallow clone here would only
+// Clone (shallow, --depth 1): it lands a write-back on the target branch,
+// pushes another idempotency-keyed commit on top of it, then replays the
+// *first* one (no longer the branch tip) and asserts it's still found. A regression to a shallow clone here would only
 // see the tip commit and incorrectly conclude "not yet applied", producing a
 // duplicate commit.
 func TestGitWriteBackCLI_IdempotencyScanFindsNonTipCommit(t *testing.T) {
@@ -183,7 +181,6 @@ func TestGitWriteBackCLI_IdempotencyScanFindsNonTipCommit(t *testing.T) {
 
 	tgt := target()
 	tgt.RepoURL = remote
-	tgt.WriteBackPolicy = domain.WriteBackPullRequest
 
 	firstReq := requestFor(tgt, "250m")
 	firstResult, err := svc.Apply(context.Background(), firstReq)
@@ -193,23 +190,15 @@ func TestGitWriteBackCLI_IdempotencyScanFindsNonTipCommit(t *testing.T) {
 	if firstResult.AlreadyApplied {
 		t.Fatalf("expected a fresh commit for the first request")
 	}
-	if firstResult.Branch == tgt.Branch {
-		t.Fatalf("expected a pull-request policy to use a topic branch distinct from %q, got %q", tgt.Branch, firstResult.Branch)
+	if firstResult.Branch != tgt.Branch {
+		t.Fatalf("expected the write-back to land on %q, got %q", tgt.Branch, firstResult.Branch)
 	}
 
-	// A second, different container on the *same* topic-branch-naming scheme
-	// would normally get its own branch (the name is derived from
-	// ContainerName+IdempotencyKey), so to land two different commits on the
-	// exact same branch here, apply a second, different recommended value
-	// for the same container -- this changes the IdempotencyKey (different
-	// requested value), producing a different topic branch name too. To
-	// force both commits onto one branch (proving the history scan walks
-	// past the tip), commit a second, unrelated change directly onto that
-	// same branch out-of-band, tagged with a *different* idempotency key,
-	// then apply-and-replay the *first* request again.
-	topicBranch := firstResult.Branch
+	// Push a second, unrelated change onto the same branch out-of-band,
+	// tagged with a *different* idempotency key, so the first write-back is
+	// no longer the tip; then replay the first request.
 	otherKey := "sha256:unrelated-commit-for-this-test"
-	pushUnrelatedCommit(t, remote, topicBranch, "deploy/checkout-api.yaml", strings.ReplaceAll(manifestWithComments, "memory: 256Mi", "memory: 300Mi"), otherKey)
+	pushUnrelatedCommit(t, remote, tgt.Branch, "deploy/checkout-api.yaml", strings.ReplaceAll(manifestWithComments, "memory: 256Mi", "memory: 300Mi"), otherKey)
 
 	replayResult, err := svc.Apply(context.Background(), firstReq)
 	if err != nil {

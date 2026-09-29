@@ -358,22 +358,9 @@ func TestHelmValuesPatcher_PlainDottedPath(t *testing.T) {
 	}
 }
 
-func TestKustomizePatcher_IsStub(t *testing.T) {
-	p := NewKustomizePatchPatcher()
-	if p.SourceType() != domain.SourceTypeKustomizePatch {
-		t.Fatalf("unexpected source type %q", p.SourceType())
-	}
-	if _, err := p.ReadCurrentValues(context.Background(), nil, domain.WriteTarget{}); !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented, got %v", err)
-	}
-	if _, _, err := p.Patch(context.Background(), nil, domain.PatchRequest{}); !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented, got %v", err)
-	}
-}
-
 func TestDefaultRegistry(t *testing.T) {
 	reg := DefaultRegistry()
-	for _, st := range []domain.SourceType{domain.SourceTypeYAML, domain.SourceTypeHelmValues, domain.SourceTypeKustomizePatch} {
+	for _, st := range []domain.SourceType{domain.SourceTypeYAML, domain.SourceTypeHelmValues} {
 		if _, ok := reg.For(st); !ok {
 			t.Fatalf("expected registry to have an entry for %q", st)
 		}

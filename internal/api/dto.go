@@ -133,7 +133,6 @@ type RecommendationDTO struct {
 type OperationDTO struct {
 	Branch       string    `json:"branch,omitempty"`
 	CommitSHA    string    `json:"commitSha,omitempty"`
-	PRURL        string    `json:"prUrl,omitempty"`
 	ErrorMessage string    `json:"errorMessage,omitempty"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }

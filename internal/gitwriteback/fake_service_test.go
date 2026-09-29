@@ -80,9 +80,6 @@ func TestFakeGitWriteBackService_CommitPolicy_CreatesCommitOnBranch(t *testing.T
 	if result.CommitSHA == "" {
 		t.Fatalf("expected a commit SHA")
 	}
-	if result.PRURL != "" {
-		t.Fatalf("expected no PR URL for commit policy, got %q", result.PRURL)
-	}
 
 	clone := gittest.CloneWorktree(t, remote)
 	wt, err := clone.Worktree()
@@ -91,40 +88,6 @@ func TestFakeGitWriteBackService_CommitPolicy_CreatesCommitOnBranch(t *testing.T
 	}
 	if content := gittest.ReadFile(t, wt, "deploy.yaml"); !strings.Contains(content, "cpu: 250m") {
 		t.Fatalf("expected the pushed commit to declare cpu: 250m, got:\n%s", content)
-	}
-}
-
-func TestFakeGitWriteBackService_PullRequestPolicy_PushesTopicBranch(t *testing.T) {
-	remote := gittest.NewBareRepoWithInitialCommit(t, map[string]string{"deploy.yaml": sampleManifest})
-	svc := NewFakeGitWriteBackService(remote)
-
-	target := baseTarget("deploy.yaml")
-	target.WriteBackPolicy = domain.WriteBackPullRequest
-	req := newRequest(target, "250m")
-
-	result, err := svc.Apply(context.Background(), req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.Branch == gittest.DefaultBranch {
-		t.Fatalf("expected a topic branch distinct from %q, got %q", gittest.DefaultBranch, result.Branch)
-	}
-	if !strings.HasPrefix(result.Branch, "vpa-updater/app-") {
-		t.Fatalf("expected topic branch name to start with vpa-updater/app-, got %q", result.Branch)
-	}
-	if !strings.HasPrefix(result.PRURL, "local://fake-pr/") {
-		t.Fatalf("expected a synthetic local PR URL, got %q", result.PRURL)
-	}
-
-	// The base branch itself must be untouched by a pull-request write-back.
-	clone := gittest.CloneWorktree(t, remote)
-	wt, err := clone.Worktree()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	content := gittest.ReadFile(t, wt, "deploy.yaml")
-	if !strings.Contains(content, "cpu: 100m") {
-		t.Fatalf("expected base branch to still declare cpu: 100m, got:\n%s", content)
 	}
 }
 

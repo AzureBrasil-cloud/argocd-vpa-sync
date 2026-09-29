@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -20,9 +19,9 @@ import (
 // been observed, in production, to fail against a real Azure DevOps
 // repository. It reproduces FakeGitWriteBackService's exact contract
 // (idempotent replay, no-op detection, conflict rejection via ErrConflict,
-// never force-pushing), sharing this package's workingBranchName/shortHash/
-// prURLFor/effectiveCommitMessage/buildCommitMessage/extractIdempotencyKey
-// helpers so the two implementations can never silently diverge in policy.
+// never force-pushing), sharing this package's effectiveCommitMessage/
+// buildCommitMessage/extractIdempotencyKey helpers so the two
+// implementations can never silently diverge in policy.
 //
 // One deliberate behavioral difference from the fake service: "already up to
 // date" on push cannot occur here. Every path that reaches Push has just
@@ -74,54 +73,25 @@ func (s *CLIGitWriteBackService) Apply(ctx context.Context, req WriteBackRequest
 	}
 	defer os.RemoveAll(workDir)
 
-	workingBranch := workingBranchName(req)
-	baseBranch := req.Target.Branch
+	branch := req.Target.Branch
 	repoURL := req.Target.RepoURL
 
-	workingExists, err := runner.RemoteBranchExists(ctx, repoURL, workingBranch, req.Credentials)
-	if err != nil {
-		return WriteBackResult{}, fmt.Errorf("gitwriteback: check remote branch %s: %w", workingBranch, err)
+	if err := cloneTargetBranch(ctx, runner, workDir, repoURL, branch, req.Credentials); err != nil {
+		return WriteBackResult{}, err
 	}
 
-	if workingExists {
-		// A full (non-shallow) clone is required here, not Clone's shallow
-		// default: this operation (or one with the same topic branch name)
-		// may have run before, and the idempotency-trailer scan below must
-		// see the branch's complete history, not just its tip commit.
-		if err := runner.CloneFull(ctx, workDir, repoURL, workingBranch, req.Credentials); err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: clone %s: %w", workingBranch, err)
-		}
-
-		commits, err := runner.LogMessages(ctx, workDir, "HEAD", 0)
-		if err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", workingBranch, err)
-		}
-		for _, c := range commits {
-			if key, present := extractIdempotencyKey(c.Body); present && key == req.IdempotencyKey {
-				return WriteBackResult{
-					Status:         domain.OperationApplied,
-					AlreadyApplied: true,
-					Branch:         workingBranch,
-					CommitSHA:      c.SHA,
-					PRURL:          prURLFor(req, workingBranch),
-				}, nil
-			}
-		}
-	} else {
-		baseExists, err := runner.RemoteBranchExists(ctx, repoURL, baseBranch, req.Credentials)
-		if err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: check remote branch %s: %w", baseBranch, err)
-		}
-		if !baseExists {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: base branch %q not found on remote %s", baseBranch, repoURL)
-		}
-		if err := runner.Clone(ctx, workDir, repoURL, baseBranch, req.Credentials); err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: clone %s: %w", baseBranch, err)
-		}
-		if workingBranch != baseBranch {
-			if err := runner.CheckoutNewBranch(ctx, workDir, workingBranch); err != nil {
-				return WriteBackResult{}, fmt.Errorf("gitwriteback: create branch %s: %w", workingBranch, err)
-			}
+	commits, err := runner.LogMessages(ctx, workDir, "HEAD", 0)
+	if err != nil {
+		return WriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", branch, err)
+	}
+	for _, c := range commits {
+		if key, present := extractIdempotencyKey(c.Body); present && key == req.IdempotencyKey {
+			return WriteBackResult{
+				Status:         domain.OperationApplied,
+				AlreadyApplied: true,
+				Branch:         branch,
+				CommitSHA:      c.SHA,
+			}, nil
 		}
 	}
 
@@ -141,8 +111,7 @@ func (s *CLIGitWriteBackService) Apply(ctx context.Context, req WriteBackRequest
 		return WriteBackResult{
 			Status:         domain.OperationApplied,
 			AlreadyApplied: true,
-			Branch:         workingBranch,
-			PRURL:          prURLFor(req, workingBranch),
+			Branch:         branch,
 		}, nil
 	}
 
@@ -166,19 +135,37 @@ func (s *CLIGitWriteBackService) Apply(ctx context.Context, req WriteBackRequest
 		s.OnBeforePush()
 	}
 
-	if err := runner.Push(ctx, workDir, repoURL, workingBranch, workingBranch, req.Credentials); err != nil {
+	if err := runner.Push(ctx, workDir, repoURL, branch, branch, req.Credentials); err != nil {
 		if errors.Is(err, gitexec.ErrNonFastForward) {
 			return WriteBackResult{}, fmt.Errorf("%w: %v", ErrConflict, err)
 		}
-		return WriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", workingBranch, err)
+		return WriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", branch, err)
 	}
 
 	return WriteBackResult{
 		Status:    domain.OperationApplied,
-		Branch:    workingBranch,
+		Branch:    branch,
 		CommitSHA: sha,
-		PRURL:     prURLFor(req, workingBranch),
 	}, nil
+}
+
+// cloneTargetBranch clones branch of repoURL into workDir, failing clearly
+// if the branch doesn't exist. The clone is full (non-shallow), not Clone's
+// shallow default: an operation may have landed on this branch before, and
+// the idempotency-trailer scan that follows must see its complete history,
+// not just its tip commit.
+func cloneTargetBranch(ctx context.Context, runner *gitexec.Runner, workDir, repoURL, branch string, creds domain.GitCredentials) error {
+	exists, err := runner.RemoteBranchExists(ctx, repoURL, branch, creds)
+	if err != nil {
+		return fmt.Errorf("gitwriteback: check remote branch %s: %w", branch, err)
+	}
+	if !exists {
+		return fmt.Errorf("gitwriteback: branch %q not found on remote %s", branch, repoURL)
+	}
+	if err := runner.CloneFull(ctx, workDir, repoURL, branch, creds); err != nil {
+		return fmt.Errorf("gitwriteback: clone %s: %w", branch, err)
+	}
+	return nil
 }
 
 // ApplyBatch combines every item in req into a single commit (one clone, one
@@ -210,8 +197,7 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 	}
 	defer os.RemoveAll(workDir)
 
-	workingBranch := batchWorkingBranchName(req)
-	baseBranch := req.Branch
+	branch := req.Branch
 	repoURL := req.RepoURL
 
 	// idempotencyCommits maps an already-applied item's key to the (earlier)
@@ -221,48 +207,25 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 	// them.
 	idempotencyCommits := map[string]string{}
 
-	workingExists, err := runner.RemoteBranchExists(ctx, repoURL, workingBranch, req.Credentials)
-	if err != nil {
-		return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: check remote branch %s: %w", workingBranch, err)
+	if err := cloneTargetBranch(ctx, runner, workDir, repoURL, branch, req.Credentials); err != nil {
+		return BatchWriteBackResult{}, err
 	}
 
-	if workingExists {
-		if err := runner.CloneFull(ctx, workDir, repoURL, workingBranch, req.Credentials); err != nil {
-			return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: clone %s: %w", workingBranch, err)
-		}
+	wanted := make(map[string]bool, len(req.Items))
+	for _, item := range req.Items {
+		wanted[item.IdempotencyKey] = true
+	}
 
-		wanted := make(map[string]bool, len(req.Items))
-		for _, item := range req.Items {
-			wanted[item.IdempotencyKey] = true
-		}
-
-		commits, err := runner.LogMessages(ctx, workDir, "HEAD", 0)
-		if err != nil {
-			return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", workingBranch, err)
-		}
-		for _, c := range commits {
-			for _, key := range extractIdempotencyKeys(c.Body) {
-				if wanted[key] {
-					if _, already := idempotencyCommits[key]; !already {
-						idempotencyCommits[key] = c.SHA
-					}
+	commits, err := runner.LogMessages(ctx, workDir, "HEAD", 0)
+	if err != nil {
+		return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", branch, err)
+	}
+	for _, c := range commits {
+		for _, key := range extractIdempotencyKeys(c.Body) {
+			if wanted[key] {
+				if _, already := idempotencyCommits[key]; !already {
+					idempotencyCommits[key] = c.SHA
 				}
-			}
-		}
-	} else {
-		baseExists, err := runner.RemoteBranchExists(ctx, repoURL, baseBranch, req.Credentials)
-		if err != nil {
-			return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: check remote branch %s: %w", baseBranch, err)
-		}
-		if !baseExists {
-			return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: base branch %q not found on remote %s", baseBranch, repoURL)
-		}
-		if err := runner.Clone(ctx, workDir, repoURL, baseBranch, req.Credentials); err != nil {
-			return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: clone %s: %w", baseBranch, err)
-		}
-		if workingBranch != baseBranch {
-			if err := runner.CheckoutNewBranch(ctx, workDir, workingBranch); err != nil {
-				return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: create branch %s: %w", workingBranch, err)
 			}
 		}
 	}
@@ -328,7 +291,7 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 		return BatchWriteBackResult{
 			Status:         domain.OperationApplied,
 			AlreadyApplied: true,
-			Branch:         workingBranch,
+			Branch:         branch,
 			Items:          outcomes,
 		}, nil
 	}
@@ -351,11 +314,11 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 		s.OnBeforePush()
 	}
 
-	if err := runner.Push(ctx, workDir, repoURL, workingBranch, workingBranch, req.Credentials); err != nil {
+	if err := runner.Push(ctx, workDir, repoURL, branch, branch, req.Credentials); err != nil {
 		if errors.Is(err, gitexec.ErrNonFastForward) {
 			return BatchWriteBackResult{}, fmt.Errorf("%w: %v", ErrConflict, err)
 		}
-		return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", workingBranch, err)
+		return BatchWriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", branch, err)
 	}
 
 	for i := range outcomes {
@@ -366,33 +329,8 @@ func (s *CLIGitWriteBackService) ApplyBatch(ctx context.Context, req BatchWriteB
 
 	return BatchWriteBackResult{
 		Status:    domain.OperationApplied,
-		Branch:    workingBranch,
+		Branch:    branch,
 		CommitSHA: sha,
-		PRURL:     batchPRURLFor(req, workingBranch),
 		Items:     outcomes,
 	}, nil
-}
-
-// batchWorkingBranchName is workingBranchName's batch counterpart: for a
-// direct commit it's simply the shared base branch, same as a single item;
-// for a pull-request policy it's a deterministic name derived from every
-// item's IdempotencyKey (sorted, so member order never affects the name),
-// so replaying the identical batch reuses the same topic branch.
-func batchWorkingBranchName(req BatchWriteBackRequest) string {
-	if req.WriteBackPolicy != domain.WriteBackPullRequest {
-		return req.Branch
-	}
-	keys := make([]string, len(req.Items))
-	for i, item := range req.Items {
-		keys[i] = item.IdempotencyKey
-	}
-	sort.Strings(keys)
-	return fmt.Sprintf("vpa-updater/batch-%s", shortHash(strings.Join(keys, "|")))
-}
-
-func batchPRURLFor(req BatchWriteBackRequest, branch string) string {
-	if req.WriteBackPolicy != domain.WriteBackPullRequest {
-		return ""
-	}
-	return fmt.Sprintf("local://fake-pr/%s", branch)
 }

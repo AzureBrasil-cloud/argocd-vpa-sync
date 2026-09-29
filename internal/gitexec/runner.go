@@ -133,14 +133,6 @@ func (r *Runner) RemoteBranchExists(ctx context.Context, repoURL, branch string,
 	}
 }
 
-// CheckoutNewBranch creates and checks out a new local branch at whatever
-// commit is currently checked out in dir. Used only when a brand-new
-// pull-request topic branch is being created (never for the "commit" policy,
-// where the working branch already equals the freshly cloned base branch).
-func (r *Runner) CheckoutNewBranch(ctx context.Context, dir, branch string) error {
-	return r.run(ctx, nil, "-c", "safe.directory=*", "-C", dir, "checkout", "-b", branch)
-}
-
 // Add stages path (relative to dir) in the repository at dir.
 func (r *Runner) Add(ctx context.Context, dir, path string) error {
 	return r.run(ctx, nil, "-c", "safe.directory=*", "-C", dir, "add", "--", path)

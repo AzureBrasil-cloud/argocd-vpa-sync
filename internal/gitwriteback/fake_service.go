@@ -2,8 +2,6 @@ package gitwriteback
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -25,13 +23,8 @@ import (
 
 // FakeGitWriteBackService is a fully functional GitWriteBackService that
 // operates against a real, local Git repository via go-git (no external git
-// binary required). It stands in for a real GitHub/GitLab/Azure DevOps
-// integration during this phase: same interface, real git operations
-// (branch, commit, push, conflict detection), except that a "pull-request"
-// write-back only pushes a topic branch and returns a synthetic
-// "local://fake-pr/<branch>" URL rather than calling a real hosting API --
-// that call is the exact seam a later provider-specific implementation
-// fills in.
+// binary required), for tests: same interface and the same real git
+// operations (commit, push, conflict detection) as CLIGitWriteBackService.
 type FakeGitWriteBackService struct {
 	// RemotePath is the filesystem path (or file:// URL) of the repository
 	// this instance writes to.
@@ -78,39 +71,30 @@ func (s *FakeGitWriteBackService) Apply(ctx context.Context, req WriteBackReques
 		return WriteBackResult{}, fmt.Errorf("gitwriteback: clone %s: %w", s.RemotePath, err)
 	}
 
-	workingBranch := workingBranchName(req)
-	baseBranch := req.Target.Branch
+	branch := req.Target.Branch
 
 	wt, err := repo.Worktree()
 	if err != nil {
 		return WriteBackResult{}, fmt.Errorf("gitwriteback: open worktree: %w", err)
 	}
 
-	// If the working branch already exists on the remote, this operation
-	// (or one with the same topic branch name) may have run before.
-	if workingRef, ok := resolveRemoteBranch(repo, workingBranch); ok {
-		if sha, found, err := findIdempotentCommit(repo, workingRef.Hash(), req.IdempotencyKey); err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", workingBranch, err)
-		} else if found {
-			return WriteBackResult{
-				Status:         domain.OperationApplied,
-				AlreadyApplied: true,
-				Branch:         workingBranch,
-				CommitSHA:      sha.String(),
-				PRURL:          prURLFor(req, workingBranch),
-			}, nil
-		}
-		if err := checkoutWorkingBranch(repo, wt, workingBranch, workingRef.Hash()); err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: checkout %s: %w", workingBranch, err)
-		}
-	} else {
-		baseRef, baseExists := resolveRemoteBranch(repo, baseBranch)
-		if !baseExists {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: base branch %q not found on remote %s", baseBranch, s.RemotePath)
-		}
-		if err := checkoutWorkingBranch(repo, wt, workingBranch, baseRef.Hash()); err != nil {
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: create branch %s: %w", workingBranch, err)
-		}
+	ref, ok := resolveRemoteBranch(repo, branch)
+	if !ok {
+		return WriteBackResult{}, fmt.Errorf("gitwriteback: branch %q not found on remote %s", branch, s.RemotePath)
+	}
+	// This operation may already have landed on the branch.
+	if sha, found, err := findIdempotentCommit(repo, ref.Hash(), req.IdempotencyKey); err != nil {
+		return WriteBackResult{}, fmt.Errorf("gitwriteback: scan %s history: %w", branch, err)
+	} else if found {
+		return WriteBackResult{
+			Status:         domain.OperationApplied,
+			AlreadyApplied: true,
+			Branch:         branch,
+			CommitSHA:      sha.String(),
+		}, nil
+	}
+	if err := checkoutBranch(repo, wt, branch, ref.Hash()); err != nil {
+		return WriteBackResult{}, fmt.Errorf("gitwriteback: checkout %s: %w", branch, err)
 	}
 
 	filePath := req.Target.FilePath
@@ -127,8 +111,7 @@ func (s *FakeGitWriteBackService) Apply(ctx context.Context, req WriteBackReques
 		return WriteBackResult{
 			Status:         domain.OperationApplied,
 			AlreadyApplied: true,
-			Branch:         workingBranch,
-			PRURL:          prURLFor(req, workingBranch),
+			Branch:         branch,
 		}, nil
 	}
 
@@ -155,7 +138,7 @@ func (s *FakeGitWriteBackService) Apply(ctx context.Context, req WriteBackReques
 		s.OnBeforePush()
 	}
 
-	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", workingBranch, workingBranch))
+	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branch, branch))
 	if err := repo.PushContext(ctx, &git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs:   []config.RefSpec{refSpec},
@@ -168,39 +151,15 @@ func (s *FakeGitWriteBackService) Apply(ctx context.Context, req WriteBackReques
 		case isNonFastForward(err):
 			return WriteBackResult{}, fmt.Errorf("%w: %v", ErrConflict, err)
 		default:
-			return WriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", workingBranch, err)
+			return WriteBackResult{}, fmt.Errorf("gitwriteback: push %s: %w", branch, err)
 		}
 	}
 
 	return WriteBackResult{
 		Status:    domain.OperationApplied,
-		Branch:    workingBranch,
+		Branch:    branch,
 		CommitSHA: commitHash.String(),
-		PRURL:     prURLFor(req, workingBranch),
 	}, nil
-}
-
-// workingBranchName returns the branch commits actually land on: the base
-// branch itself for a direct commit, or a deterministic topic branch (so
-// replaying the same operation reuses the same topic branch) for a
-// pull-request write-back.
-func workingBranchName(req WriteBackRequest) string {
-	if req.Target.WriteBackPolicy == domain.WriteBackPullRequest {
-		return fmt.Sprintf("vpa-updater/%s-%s", req.Target.ContainerName, shortHash(req.IdempotencyKey))
-	}
-	return req.Target.Branch
-}
-
-func shortHash(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:])[:10]
-}
-
-func prURLFor(req WriteBackRequest, branch string) string {
-	if req.Target.WriteBackPolicy != domain.WriteBackPullRequest {
-		return ""
-	}
-	return fmt.Sprintf("local://fake-pr/%s", branch)
 }
 
 func effectiveCommitMessage(req WriteBackRequest) string {
@@ -210,15 +169,13 @@ func effectiveCommitMessage(req WriteBackRequest) string {
 	return fmt.Sprintf("build: automatic update of %s", req.Target.Workload.Name)
 }
 
-// checkoutWorkingBranch checks the worktree out onto the local branch
-// `name`, pointing at `hash`. It handles all three cases go-git's
+// checkoutBranch checks the worktree out onto the local branch `name`,
+// pointing at `hash`. It handles all three cases go-git's
 // Checkout(Create: true) does not by itself: the branch is already checked
-// out (a fresh clone already has its default branch checked out locally,
-// which is exactly the case when a "commit" policy write-back's working
-// branch equals the base branch), the local branch ref already exists but
-// isn't checked out, or the local branch does not exist yet and must be
-// created.
-func checkoutWorkingBranch(repo *git.Repository, wt *git.Worktree, name string, hash plumbing.Hash) error {
+// out (a fresh clone already has its default branch checked out locally),
+// the local branch ref already exists but isn't checked out, or the local
+// branch does not exist yet and must be created.
+func checkoutBranch(repo *git.Repository, wt *git.Worktree, name string, hash plumbing.Hash) error {
 	target := plumbing.NewBranchReferenceName(name)
 
 	if head, err := repo.Head(); err == nil && head.Name() == target {

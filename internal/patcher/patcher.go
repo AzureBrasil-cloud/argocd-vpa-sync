@@ -59,14 +59,10 @@ func (r registry) For(sourceType domain.SourceType) (ManifestPatcher, bool) {
 	return p, ok
 }
 
-// DefaultRegistry wires up every known SourceType: real implementations for
-// yaml and helm-values, a stub (ErrNotImplemented on use) for
-// kustomize-patch -- kept registered so callers never need a type switch and
-// so wiring this in later isn't a breaking change.
+// DefaultRegistry wires up every known SourceType: yaml and helm-values.
 func DefaultRegistry() ManifestPatcherRegistry {
 	return NewRegistry(
 		NewYAMLPatcher(),
 		NewHelmValuesPatcher(),
-		NewKustomizePatchPatcher(),
 	)
 }

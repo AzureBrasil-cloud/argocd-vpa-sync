@@ -311,7 +311,6 @@ func (w *Worker) applyBatch(ctx context.Context, svc gitwriteback.BatchGitWriteB
 			AlreadyApplied: item.AlreadyApplied,
 			Branch:         result.Branch,
 			CommitSHA:      item.CommitSHA,
-			PRURL:          result.PRURL,
 		}, nil)
 	}
 }
@@ -347,7 +346,6 @@ func (w *Worker) recordOutcome(ctx context.Context, sel domain.PendingSelection,
 			op.Status = domain.OperationApplied
 			op.Branch = result.Branch
 			op.CommitSHA = result.CommitSHA
-			op.PRURL = result.PRURL
 			op.ErrorMessage = ""
 			recordRequestHeadroom(doc, sel, op.UpdatedAt)
 		case errors.Is(applyErr, gitwriteback.ErrConflict):

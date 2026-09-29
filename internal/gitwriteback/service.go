@@ -1,7 +1,6 @@
 // Package gitwriteback applies a selected VPA recommendation to a Git
-// repository: branch, commit (or push a topic branch for a pull/merge
-// request), idempotently and without ever force-overwriting a conflicting
-// concurrent change.
+// repository: a commit pushed straight to the target branch, idempotently
+// and without ever force-overwriting a conflicting concurrent change.
 package gitwriteback
 
 import (
@@ -48,9 +47,6 @@ type WriteBackResult struct {
 
 	Branch    string
 	CommitSHA string
-
-	// PRURL is set only when Target.WriteBackPolicy is WriteBackPullRequest.
-	PRURL string
 }
 
 // GitWriteBackService applies one resolved recommendation to Git.
@@ -134,7 +130,6 @@ type BatchWriteBackResult struct {
 
 	Branch    string
 	CommitSHA string
-	PRURL     string
 
 	// Items carries one ItemOutcome per BatchWriteBackRequest.Items, in the
 	// same order.

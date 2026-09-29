@@ -108,7 +108,7 @@ func validateSpec(spec gitopsv1alpha1.VpaGitOpsBindingSpec) []string {
 		seen[c.Name] = true
 
 		switch c.ManifestType {
-		case gitopsv1alpha1.SourceTypeHelmValues, gitopsv1alpha1.SourceTypeKustomizePatch, gitopsv1alpha1.SourceTypeYAML:
+		case gitopsv1alpha1.SourceTypeHelmValues, gitopsv1alpha1.SourceTypeYAML:
 		default:
 			errs = append(errs, fmt.Sprintf("spec.containers[%d].manifestType has unknown value %q", i, c.ManifestType))
 		}
@@ -121,7 +121,7 @@ func validateSpec(spec gitopsv1alpha1.VpaGitOpsBindingSpec) []string {
 	}
 
 	switch spec.WriteBackPolicy {
-	case "", gitopsv1alpha1.WriteBackCommit, gitopsv1alpha1.WriteBackPullRequest:
+	case "", gitopsv1alpha1.WriteBackCommit:
 	default:
 		errs = append(errs, fmt.Sprintf("spec.writeBackPolicy has unknown value %q", spec.WriteBackPolicy))
 	}

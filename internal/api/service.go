@@ -215,7 +215,6 @@ func operationDTOFor(doc *domain.StateDocument, namespace, vpaName, containerNam
 	return &OperationDTO{
 		Branch:       op.Branch,
 		CommitSHA:    op.CommitSHA,
-		PRURL:        op.PRURL,
 		ErrorMessage: op.ErrorMessage,
 		UpdatedAt:    op.UpdatedAt,
 	}
