@@ -92,6 +92,27 @@ What you get:
    comments and formatting, and commits and pushes it. Argo CD syncs it
    from there.
 
+### When a recommendation is eligible
+
+A recommendation is offered for approval only when all of these hold:
+
+- The VPA has a recommendation and the workload has a current request.
+- The recommendation respects the VPA's own `minAllowed`/`maxAllowed`.
+- It differs from the current request by at least `minChangePercent`
+  (10% by default, configurable per binding and per container).
+- The current request is outside the range the VPA considers acceptable
+  (its `lowerBound`..`upperBound`). A request already inside that range is
+  left alone.
+
+### Using it with an HPA
+
+Many workloads also scale horizontally, and that is exactly where badly
+sized requests hurt the most: an HPA's utilization is measured against the
+request, so a wrong request makes it scale at the wrong time. This tool
+exists to correct those requests. Every change is reviewed by a person
+before it reaches Git, and the request headroom setting keeps a margin
+above the VPA's number before a utilization-based HPA scales out.
+
 ## Getting started
 
 Install the Helm chart, published as an OCI artifact on Docker Hub, into
@@ -118,11 +139,11 @@ spec:
     name: payments-api
   repoURL: https://git.example.com/team/app.git
   repoBranch: main
-  writeBackPolicy: commit              # commit | pull-request (see Roadmap)
+  writeBackPolicy: commit              # default: commit and push to repoBranch
   minChangePercent: 10                 # default eligibility threshold; overridable per container
   containers:
     - name: app
-      manifestType: helm-values        # helm-values | kustomize-patch | yaml
+      manifestType: helm-values        # helm-values | yaml
       manifestPath: apps/payments/values-prd.yaml
       cpuKeyPath: resources.requests.cpu
       memoryKeyPath: resources.requests.memory
@@ -215,22 +236,6 @@ The most common values are below. See
 | `ingress.enabled` | `false` | Expose the dashboard through an Ingress |
 | `networkPolicy.enabled` | `false` | Only allow traffic to the HTTP port from `networkPolicy.from` |
 
-## Roadmap
-
-Not supported yet:
-
-- **Opening pull requests.** With `writeBackPolicy: pull-request`, the
-  change is pushed to a new branch, but the pull request itself is not
-  opened. You open it from that branch in GitHub, GitLab or Azure DevOps.
-  With the default, `commit`, the change is pushed directly to the
-  configured branch.
-- **Kustomize patches.** Bindings with `manifestType: kustomize-patch` are
-  accepted but not written yet. Use `helm-values` or `yaml`.
-- **More approval rules.** Today a recommendation is eligible when it
-  differs from the running value by at least `minChangePercent`. Two more
-  rules are planned: warn when an HPA already scales the same workload on
-  CPU, and allow separate thresholds for increases and decreases.
-
 ---
 
 ## Technical details
@@ -313,7 +318,7 @@ doesn't apply.
 | `workloadresources.Reader` | `internal/workloadresources` | VPA's live workload + container -> current resources.requests |
 | `ManifestPatcher` | `internal/patcher` | Read/patch resource values in a file, preserving structure |
 | `RepositoryCredentialsProvider` | `internal/credentials` | Resolve Git credentials without duplicating Argo CD's own |
-| `GitWriteBackService` | `internal/gitwriteback` | Branch/commit/PR, idempotently, without force-overwriting conflicts |
+| `GitWriteBackService` | `internal/gitwriteback` | Commit and push, idempotently, without force-overwriting conflicts |
 | `StateStore` | `internal/statestore` | Persist small operational state, swappable backend |
 
 ### Limits
