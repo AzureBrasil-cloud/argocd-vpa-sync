@@ -44,8 +44,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default (printf "%s-secret" (include "argocd-vpa-sync.fullname" .)) .Values.auth.existingSecret }}
 {{- end }}
 
-{{- define "argocd-vpa-sync.initialAdminSecretName" -}}
-{{- printf "%s-initial-admin-secret" (include "argocd-vpa-sync.fullname" .) }}
+{{/* The login is on only when an admin password is configured. */}}
+{{- define "argocd-vpa-sync.authEnabled" -}}
+{{- if or .Values.auth.admin.passwordHash .Values.auth.existingSecret }}true{{ end }}
 {{- end }}
 
 {{- define "argocd-vpa-sync.knownHostsConfigMap" -}}

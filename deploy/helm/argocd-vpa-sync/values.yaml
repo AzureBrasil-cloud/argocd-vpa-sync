@@ -39,33 +39,26 @@ writeback:
   # How often the write-back worker checks for newly queued selections.
   pollIntervalSeconds: 20
 
-# Local admin account guarding the dashboard and its API, in the style of
-# Argo CD's admin user.
+# Optional admin login, in the style of Argo CD's admin user. With neither
+# auth.admin.passwordHash nor auth.existingSecret set there is no login: the
+# dashboard -- including the actions that queue Git commits -- is open to
+# anyone who can reach the Service.
 auth:
-  # Disabling auth leaves the dashboard -- including the endpoints that
-  # queue Git commits -- open to anyone who can reach the Service.
-  enabled: true
   admin:
     username: admin
     # bcrypt ($2a$/$2b$/$2y$) or argon2id ($argon2id$) hash of the admin
-    # password, e.g.:
+    # password. Setting it turns the login on. E.g.:
     #   htpasswd -nbBC 10 "" 'my-password' | tr -d ':\n'
     #   argocd account bcrypt --password 'my-password'
     #   echo -n 'my-password' | argon2 "$(openssl rand -hex 16)" -id -e
-    # When empty (and no existingSecret), a random password is generated on
-    # install and stored in plain text in the Secret
-    # <fullname>-initial-admin-secret (key "password"), like Argo CD's
-    # argocd-initial-admin-secret.
     passwordHash: ""
-  # Key used to sign session tokens (at least 32 characters). Generated on
-  # install when empty. Changing it logs everyone out.
+  # Key used to sign session tokens (at least 32 characters). When empty the
+  # pod picks a random one at startup, so a restart logs everyone out.
   sessionSigningKey: ""
-  # Use an existing Secret (in the release namespace) instead of letting the
-  # chart create one. Keys:
-  #   admin.password    - the bcrypt/argon2id password hash
-  #   server.secretkey  - the session signing key (at least 32 characters)
-  # Recommended when deploying the chart with Argo CD or `helm template`,
-  # where the chart cannot look up previously generated values (see README).
+  # Use an existing Secret (in the release namespace) instead, which also
+  # turns the login on. Keys:
+  #   admin.password    - the bcrypt/argon2id password hash (required)
+  #   server.secretkey  - the session signing key (optional, >= 32 characters)
   existingSecret: ""
   sessionTTL: 24h
   # Secure flag on the session cookie. Browsers only send it over HTTPS

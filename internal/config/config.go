@@ -28,27 +28,29 @@ type Config struct {
 	// StateStore for newly queued selections.
 	WriteBackPollInterval time.Duration
 
-	// Auth configures the admin account guarding the dashboard and API.
+	// Auth configures the optional admin account guarding the dashboard and
+	// API.
 	Auth AuthConfig
 }
 
 // AuthConfig configures the local admin account (see internal/auth).
 type AuthConfig struct {
-	// Enabled requires an admin session on every /api/ route. Disabling it
-	// leaves the API -- including the endpoints that queue Git commits --
-	// open to anyone who can reach it; only meant for local development.
-	Enabled bool
-
 	Username string
 	// PasswordHash is a bcrypt or argon2id hash of the admin password.
+	// Empty means no login: the dashboard and API are open.
 	PasswordHash string
-	// SigningKey signs session tokens; at least 32 bytes.
+	// SigningKey signs session tokens; at least 32 bytes. Empty means a
+	// random key per process, so sessions don't survive a restart.
 	SigningKey string
 	SessionTTL time.Duration
 	// CookieSecure sets the Secure flag on the session cookie. Only turn it
 	// off when the dashboard is served over plain HTTP (e.g. port-forward).
 	CookieSecure bool
 }
+
+// Enabled reports whether a login is required, i.e. whether an admin
+// password is configured.
+func (c AuthConfig) Enabled() bool { return c.PasswordHash != "" }
 
 // Default returns a Config with the same defaults documented in
 // the Helm chart's deployment.yaml env vars.
@@ -60,7 +62,6 @@ func Default() Config {
 		ArgoCDNamespace:       "argocd",
 		WriteBackPollInterval: 20 * time.Second,
 		Auth: AuthConfig{
-			Enabled:      true,
 			Username:     "admin",
 			SessionTTL:   24 * time.Hour,
 			CookieSecure: true,
@@ -93,13 +94,6 @@ func FromEnv() (Config, error) {
 		cfg.WriteBackPollInterval = time.Duration(seconds) * time.Second
 	}
 
-	if v := os.Getenv("AUTH_ENABLED"); v != "" {
-		enabled, err := strconv.ParseBool(v)
-		if err != nil {
-			return Config{}, fmt.Errorf("config: AUTH_ENABLED must be a boolean, got %q", v)
-		}
-		cfg.Auth.Enabled = enabled
-	}
 	if v := os.Getenv("ADMIN_USERNAME"); v != "" {
 		cfg.Auth.Username = v
 	}

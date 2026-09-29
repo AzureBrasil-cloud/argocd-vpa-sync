@@ -9,23 +9,16 @@ Open the dashboard:
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "argocd-vpa-sync.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   http://localhost:{{ .Values.service.port }}
 {{- end }}
-{{ if not .Values.auth.enabled }}
-WARNING: auth.enabled=false -- the dashboard and the endpoints that queue Git
-commits are open to anyone who can reach the Service.
+{{ if not (include "argocd-vpa-sync.authEnabled" .) }}
+There is no login: anyone who can reach the Service can use the dashboard,
+including the actions that queue Git commits. Set auth.admin.passwordHash
+(or auth.existingSecret) to require one.
 {{- else if .Values.auth.existingSecret }}
 Log in as "{{ .Values.auth.admin.username }}" with the password whose hash is in
 Secret {{ .Values.auth.existingSecret }} (key admin.password).
-{{- else if .Values.auth.admin.passwordHash }}
-Log in as "{{ .Values.auth.admin.username }}" with the password matching auth.admin.passwordHash.
 {{- else }}
-Log in as "{{ .Values.auth.admin.username }}" with the generated initial password:
-
-  kubectl -n {{ .Release.Namespace }} get secret {{ include "argocd-vpa-sync.initialAdminSecretName" . }} \
-    -o jsonpath='{.data.password}' | base64 -d; echo
-
-Set auth.admin.passwordHash (or auth.existingSecret) to choose your own; the
-initial-admin Secret is then removed.
+Log in as "{{ .Values.auth.admin.username }}" with the password matching auth.admin.passwordHash.
 {{- end }}
 
 Opt a VPA in by creating a VpaGitOpsBinding next to it -- see
-https://github.com/AzureBrasil-cloud/argocd-vpa-sync#opting-a-vpa-in
+https://github.com/AzureBrasil-cloud/argocd-vpa-sync#getting-started

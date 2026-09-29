@@ -48,10 +48,12 @@ jobs:
       - name: helm template (every auth mode)
         run: |
           chart=deploy/helm/argocd-vpa-sync
+          # no login (default)
           helm template t $chart >/dev/null
+          helm template t $chart --set 'auth.admin.passwordHash=$2a$10$abcdefghijklmnopqrstuv' >/dev/null
           helm template t $chart --set 'auth.admin.passwordHash=$2a$10$abcdefghijklmnopqrstuv' --set auth.sessionSigningKey=0123456789abcdef0123456789abcdef >/dev/null
           helm template t $chart --set auth.existingSecret=my-auth >/dev/null
-          helm template t $chart --set auth.enabled=false --set ingress.enabled=true --set networkPolicy.enabled=true --set ssh.extraKnownHosts='github.com ssh-ed25519 AAAA' >/dev/null
+          helm template t $chart --set ingress.enabled=true --set networkPolicy.enabled=true --set ssh.extraKnownHosts='github.com ssh-ed25519 AAAA' >/dev/null
 
   docker:
     runs-on: ubuntu-latest

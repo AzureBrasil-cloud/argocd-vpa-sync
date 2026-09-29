@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -106,20 +107,26 @@ func run(logger *slog.Logger) error {
 		State:          statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),
 	}
 	var serverOpts []api.Option
-	if cfg.Auth.Enabled {
+	if cfg.Auth.Enabled() {
+		signingKey := []byte(cfg.Auth.SigningKey)
+		if len(signingKey) == 0 {
+			signingKey = make([]byte, auth.MinSigningKeyLength)
+			_, _ = rand.Read(signingKey)
+			logger.Info("no SESSION_SIGNING_KEY set: using a random one, so sessions won't survive a restart")
+		}
 		authenticator, err := auth.New(auth.Config{
 			Username:     cfg.Auth.Username,
 			PasswordHash: cfg.Auth.PasswordHash,
-			SigningKey:   []byte(cfg.Auth.SigningKey),
+			SigningKey:   signingKey,
 			SessionTTL:   cfg.Auth.SessionTTL,
 		})
 		if err != nil {
-			return fmt.Errorf("configure authentication (set ADMIN_PASSWORD_HASH and SESSION_SIGNING_KEY, or AUTH_ENABLED=false for local development): %w", err)
+			return fmt.Errorf("configure authentication: %w", err)
 		}
 		serverOpts = append(serverOpts, api.WithAuth(authenticator, cfg.Auth.CookieSecure))
 		logger.Info("authentication enabled", "username", cfg.Auth.Username)
 	} else {
-		logger.Warn("authentication disabled (AUTH_ENABLED=false): the dashboard and API are open to anyone who can reach them")
+		logger.Info("authentication disabled: no ADMIN_PASSWORD_HASH set, the dashboard is open to anyone who can reach it")
 	}
 	server := api.NewServer(svc, logger, serverOpts...)
 

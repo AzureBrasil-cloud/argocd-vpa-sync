@@ -42,7 +42,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
         "admin": {
           "type": "object",
           "additionalProperties": false,

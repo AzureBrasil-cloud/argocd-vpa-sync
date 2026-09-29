@@ -27,7 +27,7 @@ spec:
         # Env vars are only read at startup: roll the pod when the auth
         # values change. (Rotating an existingSecret needs a manual
         # `kubectl rollout restart`.)
-        checksum/auth: {{ list .Values.auth.enabled .Values.auth.admin .Values.auth.sessionSigningKey .Values.auth.existingSecret | toJson | sha256sum }}
+        checksum/auth: {{ list .Values.auth.admin .Values.auth.sessionSigningKey .Values.auth.existingSecret | toJson | sha256sum }}
         checksum/known-hosts: {{ .Values.ssh.extraKnownHosts | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -66,9 +66,7 @@ spec:
               value: {{ .Values.writeback.pollIntervalSeconds | quote }}
             - name: SSH_KNOWN_HOSTS
               value: /app/config/ssh/ssh_known_hosts
-            - name: AUTH_ENABLED
-              value: {{ .Values.auth.enabled | quote }}
-            {{- if .Values.auth.enabled }}
+            {{- if include "argocd-vpa-sync.authEnabled" . }}
             - name: ADMIN_USERNAME
               value: {{ .Values.auth.admin.username | quote }}
             - name: ADMIN_PASSWORD_HASH
@@ -81,6 +79,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "argocd-vpa-sync.authSecretName" . }}
                   key: server.secretkey
+                  optional: true
             - name: SESSION_TTL
               value: {{ .Values.auth.sessionTTL | quote }}
             - name: COOKIE_SECURE
