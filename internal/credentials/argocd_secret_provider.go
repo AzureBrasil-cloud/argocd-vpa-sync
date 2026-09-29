@@ -36,7 +36,7 @@ type ArgoCDSecretProvider struct {
 
 // NewArgoCDSecretProvider builds an ArgoCDSecretProvider. The RBAC granted
 // to this controller's ServiceAccount must scope `client`'s access to only
-// the Secrets in argoCDNamespace (see deploy/manifests) -- this type itself
+// the Secrets in argoCDNamespace (see the Helm chart) -- this type itself
 // applies no additional filtering beyond the label/prefix match below, so it
 // relies on RBAC, not on its own logic, to keep reads scoped.
 func NewArgoCDSecretProvider(c client.Client, argoCDNamespace string) *ArgoCDSecretProvider {

@@ -1,0 +1,37 @@
+{{- /*
+Read/write access to exactly one Secret, the operational state document
+(see internal/statestore), which the controller creates on first use.
+Kubernetes RBAC cannot scope "create" by name, so that verb is granted on
+Secrets in the release namespace; it does not allow reading any of them.
+*/ -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ include "argocd-vpa-updater.stateSecretName" . | quote }}]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "argocd-vpa-updater.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

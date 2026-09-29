@@ -1,7 +1,7 @@
 BINARY := argocd-vpa-updater
 CRD_API_PATH := ./internal/apis/vpagitopsbinding/v1alpha1/...
 
-.PHONY: build build-dist test vet fmt web-build web-dev run run-dist manifests generate crds
+.PHONY: build build-dist test vet fmt web-build web-dev run run-dist manifests chart-lint generate crds
 
 build:
 	go build -o bin/$(BINARY) ./cmd/argocd-vpa-updater
@@ -32,15 +32,20 @@ web-build:
 web-dev:
 	cd web && npm install && npm run dev
 
-# Renders the Kubernetes manifests without applying them, for review.
+CHART := deploy/helm/argocd-vpa-updater
+
+# Renders the Helm chart without applying it, for review.
 manifests:
-	kubectl kustomize deploy/manifests
+	helm template argocd-vpa-updater $(CHART) --namespace argocd
+
+chart-lint:
+	helm lint $(CHART)
 
 # Regenerates zz_generated.deepcopy.go from +kubebuilder:object:... markers
 # on the VpaGitOpsBinding CRD types.
 generate:
 	go tool controller-gen object:headerFile="" paths="$(CRD_API_PATH)"
 
-# Regenerates the CRD YAML from the same markers into deploy/manifests/crds.
+# Regenerates the CRD YAML from the same markers into the chart's crds/.
 crds:
-	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths="$(CRD_API_PATH)" output:crd:artifacts:config=deploy/manifests/crds
+	go tool controller-gen crd:crdVersions=v1,allowDangerousTypes=true paths="$(CRD_API_PATH)" output:crd:artifacts:config=$(CHART)/crds

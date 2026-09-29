@@ -364,7 +364,7 @@ func (r *Runner) prepareCredentials(creds domain.GitCredentials) ([]string, func
 			sshCmd += " -o UserKnownHostsFile=" + shellQuote(khPath)
 		case os.Getenv("SSH_KNOWN_HOSTS") != "":
 			// Falls back to the same known_hosts file the rest of the
-			// process already uses (see deploy/manifests: mounted from
+			// process already uses (see the Helm chart: mounted from
 			// Argo CD's own argocd-ssh-known-hosts-cm ConfigMap).
 			sshCmd += " -o UserKnownHostsFile=" + shellQuote(os.Getenv("SSH_KNOWN_HOSTS"))
 		}

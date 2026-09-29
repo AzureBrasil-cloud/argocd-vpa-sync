@@ -1,6 +1,6 @@
 // Package config defines argocd-vpa-updater's runtime configuration,
 // populated from environment variables (matching the env vars set in
-// deploy/manifests/Deployment).
+// deploy/helm/argocd-vpa-updater/templates/deployment.yaml).
 package config
 
 import (
@@ -51,7 +51,7 @@ type AuthConfig struct {
 }
 
 // Default returns a Config with the same defaults documented in
-// deploy/manifests/Deployment's env vars.
+// the Helm chart's deployment.yaml env vars.
 func Default() Config {
 	return Config{
 		ListenAddr:            ":8080",

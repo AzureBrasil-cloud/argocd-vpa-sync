@@ -1,0 +1,12 @@
+{{- if .Values.ssh.extraKnownHosts }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "argocd-vpa-updater.knownHostsConfigMap" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+data:
+  ssh_known_hosts: |
+    {{- .Values.ssh.extraKnownHosts | nindent 4 }}
+{{- end }}

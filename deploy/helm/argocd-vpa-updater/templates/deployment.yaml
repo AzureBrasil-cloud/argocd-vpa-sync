@@ -1,0 +1,133 @@
+{{- if ne (int .Values.replicaCount) 1 }}
+{{- fail "replicaCount must be 1: the write-back worker has no leader election" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "argocd-vpa-updater.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Never run two write-back workers side by side, even during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "argocd-vpa-updater.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "argocd-vpa-updater.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Env vars are only read at startup: roll the pod when the auth
+        # values change. (Rotating an existingSecret needs a manual
+        # `kubectl rollout restart`.)
+        checksum/auth: {{ list .Values.auth.enabled .Values.auth.admin .Values.auth.sessionSigningKey .Values.auth.existingSecret | toJson | sha256sum }}
+        checksum/known-hosts: {{ .Values.ssh.extraKnownHosts | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "argocd-vpa-updater.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: argocd-vpa-updater
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: STATE_SECRET_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: STATE_SECRET_NAME
+              value: {{ include "argocd-vpa-updater.stateSecretName" . | quote }}
+            - name: ARGOCD_NAMESPACE
+              value: {{ .Values.argocd.namespace | quote }}
+            - name: WRITEBACK_POLL_INTERVAL_SECONDS
+              value: {{ .Values.writeback.pollIntervalSeconds | quote }}
+            - name: SSH_KNOWN_HOSTS
+              value: /app/config/ssh/ssh_known_hosts
+            - name: AUTH_ENABLED
+              value: {{ .Values.auth.enabled | quote }}
+            {{- if .Values.auth.enabled }}
+            - name: ADMIN_USERNAME
+              value: {{ .Values.auth.admin.username | quote }}
+            - name: ADMIN_PASSWORD_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "argocd-vpa-updater.authSecretName" . }}
+                  key: admin.password
+            - name: SESSION_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "argocd-vpa-updater.authSecretName" . }}
+                  key: server.secretkey
+            - name: SESSION_TTL
+              value: {{ .Values.auth.sessionTTL | quote }}
+            - name: COOKIE_SECURE
+              value: {{ .Values.auth.cookieSecure | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: ssh-known-hosts
+              mountPath: /app/config/ssh
+              readOnly: true
+            # Git clones and its isolated HOME live in os.TempDir().
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: ssh-known-hosts
+          configMap:
+            name: {{ include "argocd-vpa-updater.knownHostsConfigMap" . }}
+            optional: true
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

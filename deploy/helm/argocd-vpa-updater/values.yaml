@@ -1,0 +1,141 @@
+image:
+  repository: azurebrasil/argocd-vpa-updater
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Only 1 is supported: the write-back worker has no leader election, so
+# several replicas would race to commit the same selections.
+replicaCount: 1
+
+argocd:
+  # Namespace Argo CD runs in. The Applications referenced by
+  # VpaGitOpsBindings, and the repository credential Secrets used to push to
+  # Git (argocd.argoproj.io/secret-type: repository|repo-creds), are read
+  # from here.
+  namespace: argocd
+
+ssh:
+  # ConfigMap (key ssh_known_hosts, in the release namespace) with the SSH
+  # host keys git trusts when pushing over SSH. The default reuses Argo CD's
+  # own, which only works when the chart is installed in Argo CD's namespace.
+  knownHostsConfigMap: argocd-ssh-known-hosts-cm
+  # Host keys to trust instead, in ssh_known_hosts format. When set, the
+  # chart creates its own ConfigMap and ignores knownHostsConfigMap.
+  extraKnownHosts: ""
+
+state:
+  # Secret (in the release namespace) the controller keeps its operational
+  # state in: pending selections and write-back results. The controller
+  # creates it on first use, so it is not managed by Helm/Argo CD and
+  # survives uninstall. Defaults to <fullname>-state.
+  secretName: ""
+
+writeback:
+  # How often the write-back worker checks for newly queued selections.
+  pollIntervalSeconds: 20
+
+# Local admin account guarding the dashboard and its API, in the style of
+# Argo CD's admin user.
+auth:
+  # Disabling auth leaves the dashboard -- including the endpoints that
+  # queue Git commits -- open to anyone who can reach the Service.
+  enabled: true
+  admin:
+    username: admin
+    # bcrypt ($2a$/$2b$/$2y$) or argon2id ($argon2id$) hash of the admin
+    # password, e.g.:
+    #   htpasswd -nbBC 10 "" 'my-password' | tr -d ':\n'
+    #   argocd account bcrypt --password 'my-password'
+    #   echo -n 'my-password' | argon2 "$(openssl rand -hex 16)" -id -e
+    # When empty (and no existingSecret), a random password is generated on
+    # install and stored in plain text in the Secret
+    # <fullname>-initial-admin-secret (key "password"), like Argo CD's
+    # argocd-initial-admin-secret.
+    passwordHash: ""
+  # Key used to sign session tokens (at least 32 characters). Generated on
+  # install when empty. Changing it logs everyone out.
+  sessionSigningKey: ""
+  # Use an existing Secret (in the release namespace) instead of letting the
+  # chart create one. Keys:
+  #   admin.password    - the bcrypt/argon2id password hash
+  #   server.secretkey  - the session signing key (at least 32 characters)
+  # Recommended when deploying the chart with Argo CD or `helm template`,
+  # where the chart cannot look up previously generated values (see README).
+  existingSecret: ""
+  sessionTTL: 24h
+  # Secure flag on the session cookie. Browsers only send it over HTTPS
+  # (plain-HTTP http://localhost port-forwards are the exception), so turn
+  # it off only when serving the dashboard over plain HTTP on another host.
+  cookieSecure: true
+
+serviceAccount:
+  create: true
+  # Defaults to <fullname>.
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: vpa-updater.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: vpa-updater-tls
+  #    hosts:
+  #      - vpa-updater.example.com
+
+networkPolicy:
+  # Restricts ingress to the HTTP port. Egress (Kubernetes API, Git) is not
+  # restricted.
+  enabled: false
+  # Peers allowed to reach the HTTP port (NetworkPolicyPeer list). Empty
+  # allows every source, e.g.:
+  #   - namespaceSelector:
+  #       matchLabels:
+  #         kubernetes.io/metadata.name: ingress-nginx
+  from: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Extra environment variables for the container.
+extraEnv: []
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

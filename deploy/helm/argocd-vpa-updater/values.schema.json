@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository"]
+    },
+    "replicaCount": { "const": 1 },
+    "argocd": {
+      "type": "object",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"]
+    },
+    "ssh": {
+      "type": "object",
+      "properties": {
+        "knownHostsConfigMap": { "type": "string" },
+        "extraKnownHosts": { "type": "string" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "secretName": { "type": "string" }
+      }
+    },
+    "writeback": {
+      "type": "object",
+      "properties": {
+        "pollIntervalSeconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "admin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "username": { "type": "string", "minLength": 1 },
+            "passwordHash": {
+              "type": "string",
+              "pattern": "^$|^\\$(2[aby]|argon2id)\\$",
+              "description": "bcrypt ($2a$/$2b$/$2y$) or argon2id ($argon2id$) hash of the admin password"
+            }
+          }
+        },
+        "sessionSigningKey": {
+          "type": "string",
+          "anyOf": [{ "maxLength": 0 }, { "minLength": 32 }]
+        },
+        "existingSecret": { "type": "string" },
+        "sessionTTL": { "type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$" },
+        "cookieSecure": { "type": "boolean" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hosts": { "type": "array" },
+        "tls": { "type": "array" }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "from": { "type": "array" }
+      }
+    },
+    "extraEnv": { "type": "array" }
+  }
+}

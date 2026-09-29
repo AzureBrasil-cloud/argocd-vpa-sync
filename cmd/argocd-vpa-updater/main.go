@@ -76,7 +76,7 @@ func run(logger *slog.Logger) error {
 			// The manager's default client caches objects via list+watch
 			// informers, which would require cluster-wide list/watch on
 			// Secrets -- far broader than the minimal, resourceName-scoped
-			// RBAC this controller is granted (see deploy/manifests). Secret
+			// RBAC this controller is granted (see deploy/helm/argocd-vpa-updater/templates). Secret
 			// reads/writes go straight to the API server instead, using only
 			// the get/update/list verbs the Roles actually grant. The same
 			// reasoning applies to the workload kinds the dashboard reads

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: argocd-vpa-updater
+description: GitOps bridge for Vertical Pod Autoscaler recommendations - review VPA suggestions in a dashboard and commit the chosen requests/limits back to the Git repository Argo CD syncs from.
+type: application
+version: 0.1.0
+appVersion: "1.4.0"
+home: https://github.com/AzureBrasil-cloud/argocd-vpa-sync
+sources:
+  - https://github.com/AzureBrasil-cloud/argocd-vpa-sync
+keywords:
+  - argocd
+  - gitops
+  - vpa
+  - vertical-pod-autoscaler
+  - kubernetes
+maintainers:
+  - name: AzureBrasil
