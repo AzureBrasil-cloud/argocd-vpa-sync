@@ -21,33 +21,29 @@ VPA recommendation → seleção no dashboard → commit no Git → sync do Argo
 No Pod, Deployment or StatefulSet is ever modified directly by this
 controller — the only path to a change is a Git commit.
 
-## Current scope (this phase)
+## Current scope
 
-This is the first implementation phase. It delivers:
-
-- The project's core contracts (see [Architecture](#architecture) below).
 - A CRD (`VpaGitOpsBinding`) that opts a VPA in and configures its write-back
   target; a controller that watches these bindings and normalizes the
   referenced VPAs' recommendations.
-- A **read-only** HTTP API and dashboard: list and detail views comparing
-  the VPA recommendation to the value currently requested by the live
-  workload (Deployment/StatefulSet/CronJob) it targets, with delta and
-  eligibility computed per container. This is deliberately not the value
-  declared in Git: a pending or stuck Argo CD sync can leave the two
-  briefly disagreeing, and reconciling that gap is this project's own job,
-  not a precondition for showing a useful number.
-- A minimal Kubernetes Secret–backed `StateStore`.
-- A **fake, fully local** `GitWriteBackService` (real Git operations via
-  [go-git](https://github.com/go-git/go-git) against a local repository) —
-  this exercises the entire commit/branch/idempotency/conflict-detection
-  logic, but is not yet wired to the dashboard or to a real GitHub/GitLab/
-  Azure DevOps integration.
+- A dashboard and HTTP API, behind an [admin login](#authentication): list
+  and detail views comparing the VPA recommendation to the value currently
+  requested by the live workload (Deployment/StatefulSet/CronJob) it
+  targets, with delta and eligibility computed per container. This is
+  deliberately not the value declared in Git: a pending or stuck Argo CD
+  sync can leave the two briefly disagreeing, and reconciling that gap is
+  this project's own job, not a precondition for showing a useful number.
+- Selecting recommendations (one or in bulk), with request headroom and
+  limit settings, queues them in a Kubernetes Secret-backed `StateStore`; a
+  write-back worker then commits and pushes them to Git with the real `git`
+  CLI, using Argo CD's own repository credentials.
 
-**Not yet implemented:** the dashboard's selection/apply UI and API
-endpoints, real Git provider write-back (GitHub/GitLab/Azure DevOps),
-Kustomize-patch support, and the full governance rule engine (HPA-CPU
-warning, per-VPA increase/decrease thresholds beyond `minChangePercent`).
-Interfaces are already shaped so none of this requires breaking changes.
+**Not yet implemented:** opening the pull request itself for
+`writeBackPolicy: pull-request` (the topic branch is pushed, the PR is not
+created), Kustomize-patch support, and the full governance rule engine
+(HPA-CPU warning, per-VPA increase/decrease thresholds beyond
+`minChangePercent`). Interfaces are already shaped so none of this requires
+breaking changes.
 
 ## Architecture
 
@@ -90,10 +86,13 @@ internal/
   eligibility/            delta + minimum-change-threshold + eligibility rules
   idempotency/            deterministic key for "this exact recommendation,
                           applied to this exact target"
-  api/                    read-only HTTP API consumed by the dashboard
+  auth/                   admin password hashes (bcrypt/argon2id), signed
+                          session tokens, login throttling
+  api/                    HTTP API consumed by the dashboard
 
 web/                      React + Vite dashboard (SPA)
-deploy/manifests/         Kubernetes manifests (RBAC, Deployment, Service, state Secret)
+deploy/helm/argocd-vpa-sync/
+                          Helm chart (CRD, RBAC, Deployment, Service, auth Secret)
 test/integration/         end-to-end test against a real local Git repository
 ```
 
@@ -214,8 +213,10 @@ data comes from either the matched Secret's `sshKnownHosts` field, or, since
 that field is rarely populated on Argo CD's own repo Secrets, from Argo CD's
 central `argocd-ssh-known-hosts-cm` ConfigMap (mounted as `optional: true`, so
 its absence never blocks the pod from starting), pointed at via
-`SSH_KNOWN_HOSTS` (see `deploy/manifests/06-deployment.yaml` and
-`internal/gitexec/runner.go`). This mirrors the same ConfigMap/mount
+`SSH_KNOWN_HOSTS` (see the chart's `ssh.*` values and
+`internal/gitexec/runner.go`). That ConfigMap can only be mounted when the
+chart is installed in Argo CD's namespace; elsewhere, set
+`ssh.extraKnownHosts`. This mirrors the same ConfigMap/mount
 convention as the upstream `argocd-image-updater` Helm chart, which is why
 that controller has never needed extra known_hosts configuration here either.
 A host missing from both — e.g. a
@@ -226,7 +227,8 @@ Settings → Certificates UI).
 
 ## RBAC
 
-See `deploy/manifests/` for the exact manifests. Summary:
+See `deploy/helm/argocd-vpa-sync/templates/rbac-*.yaml` for the exact
+rules. Summary:
 
 | Scope | Resource | Verbs |
 |---|---|---|
@@ -236,8 +238,9 @@ See `deploy/manifests/` for the exact manifests. Summary:
 | cluster | `argocd-vpa-updater.argoproj.io/vpagitopsbindings/status` | get, update, patch |
 | cluster | `apps/deployments`, `apps/statefulsets` | get |
 | cluster | `batch/cronjobs` | get |
-| `argocd` namespace | `secrets/argocd-vpa-updater-state` (by name) | get, update |
-| `argocd` namespace | `secrets` | get, list, watch |
+| release namespace | `secrets/<release>-state` (by name) | get, update |
+| release namespace | `secrets` | create |
+| Argo CD namespace | `secrets` | get, list, watch |
 
 The Deployment/StatefulSet/CronJob grant is `get` only, never `list`/`watch`:
 the dashboard reads one named workload at a time to show the container
@@ -245,10 +248,14 @@ resources currently running (`internal/workloadresources`), it never
 enumerates them, and its client has caching disabled for these types so no
 cluster-wide watch is ever attempted.
 
-The `argocd` namespace grant is broader than ideal — Kubernetes RBAC cannot
+The controller creates its state Secret on first use, so its content is
+never owned (or reset) by Helm or Argo CD. RBAC cannot scope `create` by
+name, hence the namespace-wide `create`; it grants no read access.
+
+The Argo CD namespace grant is broader than ideal — Kubernetes RBAC cannot
 filter `list`/`watch` on Secrets by label — see the comment in
-`deploy/manifests/04-role-repo-creds.yaml` for the full rationale and
-follow-up options. The application code itself only ever reads
+`templates/rbac-repo-creds.yaml` for the full rationale and follow-up
+options. The application code itself only ever reads
 labeled repository-credential Secrets and never logs or returns their
 content (`domain.GitCredentials` redacts itself in every serialization
 path).
@@ -257,7 +264,9 @@ path).
 
 ```sh
 go build ./cmd/argocd-vpa-updater
-KUBECONFIG=... ./argocd-vpa-updater     # needs a cluster with the VPA CRDs installed
+# needs a cluster with the VPA CRDs installed; see Authentication below to
+# run with a login instead
+KUBECONFIG=... AUTH_ENABLED=false ./argocd-vpa-updater
 
 cd web && npm install && npm run dev    # dashboard, proxies /api to :8080
 ```
@@ -267,6 +276,7 @@ cd web && npm install && npm run dev    # dashboard, proxies /api to :8080
 ```sh
 go build ./... && go vet ./... && go test ./...
 cd web && npm run build
+helm lint deploy/helm/argocd-vpa-sync
 ```
 
 Unit tests cover delta/eligibility calculation, idempotency key derivation,
@@ -282,13 +292,94 @@ without partially writing anything.
 
 ## Deploying
 
+The Helm chart is published as an OCI artifact on Docker Hub, and the image
+as `azurebrasil/argocd-vpa-updater` (linux/amd64 and linux/arm64):
+
 ```sh
-kubectl apply -k deploy/manifests
+helm install argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
+  --version 0.1.0 --namespace argocd
 ```
 
-This creates the `VpaGitOpsBinding` CRD, the ServiceAccount, RBAC, a
-bootstrapped (empty) state Secret, and the Deployment/Service, all in the
-`argocd` namespace — this controller is deployed alongside Argo CD itself
-rather than into a namespace of its own (override via the
-`ARGOCD_NAMESPACE`/`STATE_SECRET_NAMESPACE` env vars on the Deployment if
-Argo CD lives elsewhere).
+Installing into Argo CD's own namespace (`argocd` by default) is the
+simplest option: it lets the pod mount Argo CD's `argocd-ssh-known-hosts-cm`.
+Anywhere else, set `argocd.namespace` to where Argo CD runs and
+`ssh.extraKnownHosts` to the SSH host keys to trust. See
+[`values.yaml`](deploy/helm/argocd-vpa-sync/values.yaml) for every option.
+
+Helm installs the `VpaGitOpsBinding` CRD from the chart's `crds/` directory
+on first install but, by design, never upgrades or deletes it. After an
+upgrade that changes the CRD, apply it yourself:
+
+```sh
+helm pull oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync --version <version> --untar
+kubectl apply --server-side -f argocd-vpa-sync/crds/
+```
+
+### Authentication
+
+Every `/api/` route requires a session from a single local admin account,
+modelled on Argo CD's `admin` user: the password is only ever stored as a
+**bcrypt** or **argon2id** hash, and a login is exchanged for an HMAC-signed
+session token (an `HttpOnly`, `SameSite=Strict` cookie; API clients can send
+the `token` returned by `POST /api/v1/session` as `Authorization: Bearer`).
+Sessions last `auth.sessionTTL` (24h), and changing the password hash
+invalidates every existing session. Failed logins are throttled per client
+IP.
+
+There are three ways to set the password:
+
+1. **Generated (default).** On install the chart generates a random
+   password, stores its bcrypt hash in `<release>-secret`, and the plain
+   text in `<release>-initial-admin-secret`, like Argo CD's
+   `argocd-initial-admin-secret`:
+
+   ```sh
+   kubectl -n argocd get secret argocd-vpa-sync-initial-admin-secret \
+     -o jsonpath='{.data.password}' | base64 -d; echo
+   ```
+
+2. **Your own hash**, via `auth.admin.passwordHash`. The initial-admin
+   Secret is removed once this is set.
+
+   ```sh
+   # bcrypt
+   htpasswd -nbBC 10 "" 'my-password' | tr -d ':\n'
+   argocd account bcrypt --password 'my-password'
+   # argon2id
+   echo -n 'my-password' | argon2 "$(openssl rand -hex 16)" -id -e
+   ```
+
+3. **An existing Secret**, via `auth.existingSecret`, with the keys
+   `admin.password` (the hash) and `server.secretkey` (the session signing
+   key, at least 32 characters). The pod reads it at startup, so run
+   `kubectl rollout restart` after rotating it.
+
+**Deploying the chart with Argo CD** (or any `helm template` flow): Helm's
+`lookup` returns nothing there, so options 1 and 2 would regenerate a
+password or signing key on every render. Use `auth.existingSecret`, or set
+both `auth.admin.passwordHash` and `auth.sessionSigningKey`.
+
+The session cookie is `Secure` by default, so browsers only send it over
+HTTPS (and `http://localhost`, so `kubectl port-forward` works). If the
+dashboard is served over plain HTTP on another host, set
+`auth.cookieSecure=false`.
+
+`auth.enabled=false` disables authentication. The dashboard and the
+endpoints that queue Git commits are then open to anyone who can reach the
+Service, so only use it for local development.
+
+Running the binary directly, the same settings are environment variables:
+`AUTH_ENABLED`, `ADMIN_USERNAME` (`admin`), `ADMIN_PASSWORD_HASH`,
+`SESSION_SIGNING_KEY`, `SESSION_TTL` (`24h`) and `COOKIE_SECURE` (`true`).
+
+### Releasing
+
+- **Image:** push a `vX.Y.Z` tag. `docker-publish.yml` publishes `X.Y.Z`,
+  `X.Y` and `latest`, and every push to `master` publishes `edge`. Keep the
+  chart's `appVersion` set to the image version it ships.
+- **Chart:** bump `version` in `deploy/helm/argocd-vpa-sync/Chart.yaml`.
+  `chart-publish.yml` pushes it on merge to `master` and never overwrites a
+  version that is already published.
+
+Both workflows need the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
+repository secrets.
