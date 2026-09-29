@@ -1,6 +1,6 @@
 // Command argocd-vpa-updater runs the controller (watching opted-in
-// VerticalPodAutoscaler objects) and the read-only dashboard API side by
-// side in one process.
+// VerticalPodAutoscaler objects), the write-back worker and the dashboard
+// API side by side in one process.
 package main
 
 import (
@@ -24,6 +24,7 @@ import (
 	"github.com/azurebrasil/argocd-vpa-updater/internal/api"
 	gitopsv1alpha1 "github.com/azurebrasil/argocd-vpa-updater/internal/apis/vpagitopsbinding/v1alpha1"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/argocdapp"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/auth"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/config"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/controller"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/credentials"
@@ -104,7 +105,23 @@ func run(logger *slog.Logger) error {
 		WorkloadReader: workloadresources.NewClusterReader(mgr.GetClient()),
 		State:          statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),
 	}
-	server := api.NewServer(svc, logger)
+	var serverOpts []api.Option
+	if cfg.Auth.Enabled {
+		authenticator, err := auth.New(auth.Config{
+			Username:     cfg.Auth.Username,
+			PasswordHash: cfg.Auth.PasswordHash,
+			SigningKey:   []byte(cfg.Auth.SigningKey),
+			SessionTTL:   cfg.Auth.SessionTTL,
+		})
+		if err != nil {
+			return fmt.Errorf("configure authentication (set ADMIN_PASSWORD_HASH and SESSION_SIGNING_KEY, or AUTH_ENABLED=false for local development): %w", err)
+		}
+		serverOpts = append(serverOpts, api.WithAuth(authenticator, cfg.Auth.CookieSecure))
+		logger.Info("authentication enabled", "username", cfg.Auth.Username)
+	} else {
+		logger.Warn("authentication disabled (AUTH_ENABLED=false): the dashboard and API are open to anyone who can reach them")
+	}
+	server := api.NewServer(svc, logger, serverOpts...)
 
 	writeBackWorker := &writebackworker.Worker{
 		State:        statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),

@@ -1,9 +1,9 @@
-// Package api implements the read-only HTTP API the dashboard consumes:
-// list and detail views of VPA recommendations compared against the value
-// currently requested by the live workload they target (see
-// internal/workloadresources). Selection/apply endpoints are not
-// implemented in this phase -- see internal/gitwriteback for the
-// write-back service they will eventually call.
+// Package api implements the HTTP API the dashboard consumes: list and
+// detail views of VPA recommendations compared against the value currently
+// requested by the live workload they target (see
+// internal/workloadresources), and select endpoints that queue a
+// recommendation for the write-back worker to commit to Git. With WithAuth,
+// every /api/ route requires an admin session (see session.go).
 package api
 
 import (
@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/azurebrasil/argocd-vpa-updater/internal/auth"
 	"github.com/azurebrasil/argocd-vpa-updater/web"
 )
 
@@ -19,14 +20,22 @@ type Server struct {
 	service *Service
 	logger  *slog.Logger
 	mux     *http.ServeMux
+
+	// auth is nil when authentication is disabled (see WithAuth).
+	auth         *auth.Authenticator
+	cookieSecure bool
+	loginLimiter *auth.LoginLimiter
 }
 
 // NewServer builds a Server backed by service.
-func NewServer(service *Service, logger *slog.Logger) *Server {
+func NewServer(service *Service, logger *slog.Logger, opts ...Option) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	s := &Server{service: service, logger: logger, mux: http.NewServeMux()}
+	for _, opt := range opts {
+		opt(s)
+	}
 	s.routes()
 	return s
 }
@@ -34,6 +43,10 @@ func NewServer(service *Service, logger *slog.Logger) *Server {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
+
+	s.mux.HandleFunc("POST /api/v1/session", s.handleLogin)
+	s.mux.HandleFunc("DELETE /api/v1/session", s.handleLogout)
+	s.mux.HandleFunc("GET /api/v1/session/userinfo", s.handleUserInfo)
 
 	s.mux.HandleFunc("GET /api/v1/recommendations", s.handleListRecommendations)
 	s.mux.HandleFunc("POST /api/v1/recommendations/bulk-select", s.handleBulkSelectRecommendations)
@@ -61,11 +74,22 @@ func (s *Server) routes() {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	lw := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+	if s.auth != nil && requiresSession(r) {
+		if _, ok := s.authenticated(r); !ok {
+			writeError(lw, http.StatusUnauthorized, "authentication required")
+			s.logRequest(r, lw.status, start)
+			return
+		}
+	}
 	s.mux.ServeHTTP(lw, r)
+	s.logRequest(r, lw.status, start)
+}
+
+func (s *Server) logRequest(r *http.Request, status int, start time.Time) {
 	s.logger.Info("http request",
 		"method", r.Method,
 		"path", r.URL.Path,
-		"status", lw.status,
+		"status", status,
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 }
