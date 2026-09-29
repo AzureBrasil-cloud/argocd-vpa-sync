@@ -7,14 +7,14 @@ Secrets in the release namespace; it does not allow reading any of them.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+  name: {{ include "argocd-vpa-sync.fullname" . }}-state
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+    {{- include "argocd-vpa-sync.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: [{{ include "argocd-vpa-updater.stateSecretName" . | quote }}]
+    resourceNames: [{{ include "argocd-vpa-sync.stateSecretName" . | quote }}]
     verbs: ["get", "update"]
   - apiGroups: [""]
     resources: ["secrets"]
@@ -23,15 +23,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+  name: {{ include "argocd-vpa-sync.fullname" . }}-state
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+    {{- include "argocd-vpa-sync.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "argocd-vpa-updater.fullname" . }}-state
+  name: {{ include "argocd-vpa-sync.fullname" . }}-state
 subjects:
   - kind: ServiceAccount
-    name: {{ include "argocd-vpa-updater.serviceAccountName" . }}
+    name: {{ include "argocd-vpa-sync.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}

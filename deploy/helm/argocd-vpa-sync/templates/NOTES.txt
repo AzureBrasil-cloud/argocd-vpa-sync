@@ -6,7 +6,7 @@ Open the dashboard:
   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
 {{- end }}
 {{- else }}
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "argocd-vpa-updater.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "argocd-vpa-sync.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   http://localhost:{{ .Values.service.port }}
 {{- end }}
 {{ if not .Values.auth.enabled }}
@@ -20,7 +20,7 @@ Log in as "{{ .Values.auth.admin.username }}" with the password matching auth.ad
 {{- else }}
 Log in as "{{ .Values.auth.admin.username }}" with the generated initial password:
 
-  kubectl -n {{ .Release.Namespace }} get secret {{ include "argocd-vpa-updater.initialAdminSecretName" . }} \
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "argocd-vpa-sync.initialAdminSecretName" . }} \
     -o jsonpath='{.data.password}' | base64 -d; echo
 
 Set auth.admin.passwordHash (or auth.existingSecret) to choose your own; the

@@ -1,6 +1,6 @@
 // Package config defines argocd-vpa-updater's runtime configuration,
 // populated from environment variables (matching the env vars set in
-// deploy/helm/argocd-vpa-updater/templates/deployment.yaml).
+// deploy/helm/argocd-vpa-sync/templates/deployment.yaml).
 package config
 
 import (

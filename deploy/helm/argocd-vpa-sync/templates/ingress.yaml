@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "argocd-vpa-updater.fullname" . }}
+  name: {{ include "argocd-vpa-sync.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+    {{- include "argocd-vpa-sync.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -28,7 +28,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "argocd-vpa-updater.fullname" $ }}
+                name: {{ include "argocd-vpa-sync.fullname" $ }}
                 port:
                   name: http
           {{- end }}

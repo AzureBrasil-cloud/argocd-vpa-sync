@@ -32,11 +32,11 @@ web-build:
 web-dev:
 	cd web && npm install && npm run dev
 
-CHART := deploy/helm/argocd-vpa-updater
+CHART := deploy/helm/argocd-vpa-sync
 
 # Renders the Helm chart without applying it, for review.
 manifests:
-	helm template argocd-vpa-updater $(CHART) --namespace argocd
+	helm template argocd-vpa-sync $(CHART) --namespace argocd
 
 chart-lint:
 	helm lint $(CHART)

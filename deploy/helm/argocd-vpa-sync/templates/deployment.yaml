@@ -4,10 +4,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "argocd-vpa-updater.fullname" . }}
+  name: {{ include "argocd-vpa-sync.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "argocd-vpa-updater.labels" . | nindent 4 }}
+    {{- include "argocd-vpa-sync.labels" . | nindent 4 }}
 spec:
   replicas: 1
   # Never run two write-back workers side by side, even during a rollout.
@@ -15,11 +15,11 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "argocd-vpa-updater.selectorLabels" . | nindent 6 }}
+      {{- include "argocd-vpa-sync.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "argocd-vpa-updater.selectorLabels" . | nindent 8 }}
+        {{- include "argocd-vpa-sync.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -33,7 +33,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "argocd-vpa-updater.serviceAccountName" . }}
+      serviceAccountName: {{ include "argocd-vpa-sync.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -59,7 +59,7 @@ spec:
             - name: STATE_SECRET_NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: STATE_SECRET_NAME
-              value: {{ include "argocd-vpa-updater.stateSecretName" . | quote }}
+              value: {{ include "argocd-vpa-sync.stateSecretName" . | quote }}
             - name: ARGOCD_NAMESPACE
               value: {{ .Values.argocd.namespace | quote }}
             - name: WRITEBACK_POLL_INTERVAL_SECONDS
@@ -74,12 +74,12 @@ spec:
             - name: ADMIN_PASSWORD_HASH
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "argocd-vpa-updater.authSecretName" . }}
+                  name: {{ include "argocd-vpa-sync.authSecretName" . }}
                   key: admin.password
             - name: SESSION_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "argocd-vpa-updater.authSecretName" . }}
+                  name: {{ include "argocd-vpa-sync.authSecretName" . }}
                   key: server.secretkey
             - name: SESSION_TTL
               value: {{ .Values.auth.sessionTTL | quote }}
@@ -115,7 +115,7 @@ spec:
       volumes:
         - name: ssh-known-hosts
           configMap:
-            name: {{ include "argocd-vpa-updater.knownHostsConfigMap" . }}
+            name: {{ include "argocd-vpa-sync.knownHostsConfigMap" . }}
             optional: true
         - name: tmp
           emptyDir: {}
