@@ -141,3 +141,15 @@ export interface LimitSpecRequest {
   value?: string
 }
 
+
+export interface LoginResponse {
+  token: string
+  expiresAt: string
+}
+
+export interface UserInfo {
+  loggedIn: boolean
+  username?: string
+  /** False when the server runs with AUTH_ENABLED=false. */
+  authEnabled: boolean
+}
