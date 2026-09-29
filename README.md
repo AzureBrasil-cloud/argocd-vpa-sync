@@ -1,51 +1,241 @@
 # argocd-vpa-updater
 
-A GitOps bridge for Kubernetes Vertical Pod Autoscaler (VPA) recommendations,
-inspired by [Argo CD Image Updater](https://argocd-image-updater.readthedocs.io/)
-but applied to container `resources` instead of image tags.
+**Right-size your Kubernetes workloads with Vertical Pod Autoscaler
+recommendations, without giving up GitOps.**
 
-## Why
+[![ci](https://github.com/AzureBrasil-cloud/argocd-vpa-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/AzureBrasil-cloud/argocd-vpa-sync/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-VPAs in `updateMode: Auto` rewrite `resources.requests`/`limits` directly on
-Pods, which makes Git stop reflecting what's actually running and causes
-Argo CD to fight the VPA on every sync. `argocd-vpa-updater` keeps VPAs in
-`updateMode: Off` (recommendation-only), shows their recommendations next to
-what's currently requested by the live workload, and — once a human selects
-and confirms a recommendation — writes the change back to Git so Argo CD
-picks it up and syncs it through the normal GitOps flow.
+## The problem
+
+Most teams guess their containers' CPU and memory requests once and never
+revisit them. The result is paid-for capacity that sits idle, and, just as
+often, workloads that are throttled or OOMKilled because they outgrew
+their original numbers.
+
+The Kubernetes [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
+(VPA) already knows better: it watches real usage and recommends a request
+for every container. But in a GitOps setup, where Argo CD keeps the cluster
+in line with Git, there is no good way to use those recommendations:
+
+- **VPA in `Auto` mode** rewrites Pods behind Git's back. The cluster
+  stops matching the repository, and Argo CD and the VPA fight over the
+  same fields on every sync.
+- **VPA in `Off` mode** only records recommendations. Someone has to find
+  them with `kubectl`, compare them with what is running, and copy the
+  numbers into each values file by hand, so in practice it rarely happens.
+
+## The solution
+
+`argocd-vpa-updater` turns VPA recommendations into reviewed Git commits.
+It keeps VPAs in recommendation-only mode, shows each recommendation next to
+what the workload is running today, and, once someone approves it, writes
+the new values to the manifest in Git. Argo CD then rolls the change out
+like any other.
 
 ```
-VPA recommendation → seleção no dashboard → commit no Git → sync do Argo CD → rollout normal
+VPA recommendation → review in the dashboard → Git commit → Argo CD sync → normal rollout
 ```
 
-No Pod, Deployment or StatefulSet is ever modified directly by this
-controller — the only path to a change is a Git commit.
+**Every recommendation next to what's running.** Deltas are colored by
+direction, and a recommendation is flagged *eligible* only when the change
+is large enough to be worth applying.
 
-## Current scope
+![Dashboard: recommendations compared with the live workloads](docs/images/dashboard-list.png)
 
-- A CRD (`VpaGitOpsBinding`) that opts a VPA in and configures its write-back
-  target; a controller that watches these bindings and normalizes the
-  referenced VPAs' recommendations.
-- A dashboard and HTTP API, behind an [admin login](#authentication): list
-  and detail views comparing the VPA recommendation to the value currently
-  requested by the live workload (Deployment/StatefulSet/CronJob) it
-  targets, with delta and eligibility computed per container. This is
-  deliberately not the value declared in Git: a pending or stuck Argo CD
-  sync can leave the two briefly disagreeing, and reconciling that gap is
-  this project's own job, not a precondition for showing a useful number.
-- Selecting recommendations (one or in bulk), with request headroom and
-  limit settings, queues them in a Kubernetes Secret-backed `StateStore`; a
-  write-back worker then commits and pushes them to Git with the real `git`
-  CLI, using Argo CD's own repository credentials.
+**Apply several at once, with safety margins.** Select the containers to
+change, optionally add headroom above the VPA's number, and choose how
+limits follow the new requests. The summary shows exactly what will be
+written, and warns when a limit would go down.
 
-**Not yet implemented:** opening the pull request itself for
-`writeBackPolicy: pull-request` (the topic branch is pushed, the PR is not
-created), Kustomize-patch support, and the full governance rule engine
-(HPA-CPU warning, per-VPA increase/decrease thresholds beyond
-`minChangePercent`). Interfaces are already shaped so none of this requires
-breaking changes.
+![Selection summary with request headroom and limit settings](docs/images/selection-summary.png)
 
-## Architecture
+**The full picture for each container**: the current value, the VPA's
+target and its lower/upper bounds, the resulting request and limit, and the
+status of the last write-back.
+
+![Recommendation detail](docs/images/recommendation-detail.png)
+
+<details>
+<summary>Cards view, and the optional login</summary>
+
+![Cards view](docs/images/dashboard-cards.png)
+
+![Login](docs/images/login.png)
+
+</details>
+
+What you get:
+
+- **Git stays the source of truth.** Nothing in the cluster is changed
+  directly: no Pod, Deployment, StatefulSet or VPA. The only way a change
+  happens is a commit in Git.
+- **A human approves every change**, using the numbers that are actually
+  running.
+- **Limits are handled.** A new request never ends up above its limit,
+  which Kubernetes would reject.
+- **No new credentials to manage.** It pushes with the repository
+  credentials Argo CD already has.
+- **Opt-in per workload.** Nothing happens until you create a
+  `VpaGitOpsBinding` for a VPA.
+
+## How it works
+
+1. **Opt a VPA in.** Create a `VpaGitOpsBinding` next to it, pointing at
+   the Git repository, the file, and the keys that hold the container's
+   resources.
+2. **Review.** The dashboard lists every opted-in container, comparing the
+   VPA's recommendation with the request of the live workload.
+3. **Select.** Pick the containers and resources to change, one at a time
+   or in bulk. Selections are queued; nothing is written yet.
+4. **Commit.** A background worker patches the file, preserving its
+   comments and formatting, and commits and pushes it. Argo CD syncs it
+   from there.
+
+## Getting started
+
+Install the Helm chart, published as an OCI artifact on Docker Hub, into
+Argo CD's namespace:
+
+```sh
+helm install argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
+  --version 0.1.0 --namespace argocd
+```
+
+Then opt a VPA in. The VPA must use `updateMode: "Off"`. The binding lives in
+the same namespace as the VPA:
+
+```yaml
+apiVersion: argocd-vpa-updater.argoproj.io/v1alpha1
+kind: VpaGitOpsBinding
+metadata:
+  name: checkout-api-vpa-sync
+  namespace: payments
+spec:
+  vpaRef:
+    name: checkout-api-vpa
+  argoCDApplicationRef:                # optional; only used for a repo-url cross-check warning
+    name: payments-api
+  repoURL: https://git.example.com/team/app.git
+  repoBranch: main
+  writeBackPolicy: commit              # commit | pull-request (see Roadmap)
+  minChangePercent: 10                 # default eligibility threshold; overridable per container
+  containers:
+    - name: app
+      manifestType: helm-values        # helm-values | kustomize-patch | yaml
+      manifestPath: apps/payments/values-prd.yaml
+      cpuKeyPath: resources.requests.cpu
+      memoryKeyPath: resources.requests.memory
+      # never inferred -- omit to leave that limit untouched
+      cpuLimitKeyPath: resources.limits.cpu
+      memoryLimitKeyPath: resources.limits.memory
+```
+
+`containers` is a list, so one binding can configure write-back for more
+than one container of the VPA's target workload. `cpuKeyPath`/`memoryKeyPath`
+support indexing into a container list by name, e.g.
+`spec.template.spec.containers[app].resources.requests.cpu` for a plain
+Deployment manifest; a Helm values file typically uses a plain dotted path
+like `resources.requests.cpu`.
+
+Open the dashboard:
+
+```sh
+kubectl -n argocd port-forward svc/argocd-vpa-sync 8080:8080
+# http://localhost:8080
+```
+
+To install it somewhere other than Argo CD's namespace, set
+`argocd.namespace` to where Argo CD runs, and `ssh.extraKnownHosts` to the
+SSH host keys to trust (see [Credentials](#credentials)).
+
+## Authentication (optional)
+
+By default there is **no login**: anyone who can reach the Service can use
+the dashboard, including the actions that queue Git commits. Keep it that
+way only behind a private network, `kubectl port-forward`, or an
+authenticating proxy.
+
+To require a login, set an admin password. As with Argo CD's `admin` user,
+the password is only ever stored as a **bcrypt** or **argon2id** hash:
+
+```sh
+# bcrypt
+htpasswd -nbBC 10 "" 'my-password' | tr -d ':\n'
+argocd account bcrypt --password 'my-password'
+# argon2id
+echo -n 'my-password' | argon2 "$(openssl rand -hex 16)" -id -e
+```
+
+```sh
+helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
+  --namespace argocd --reuse-values \
+  --set auth.admin.passwordHash='$2a$10$...' \
+  --set auth.sessionSigningKey="$(openssl rand -hex 32)"
+```
+
+Or keep the credentials out of your values with an existing Secret, via
+`auth.existingSecret`. It needs the key `admin.password` (the hash) and,
+optionally, `server.secretkey` (the session signing key, at least 32
+characters).
+
+- Signing in returns a session that lasts `auth.sessionTTL` (24h), stored
+  in an `HttpOnly`, `SameSite=Strict` cookie. API clients can send the
+  `token` returned by `POST /api/v1/session` as `Authorization: Bearer`
+  instead.
+- Changing the password logs everyone out. So does restarting the pod when
+  no `sessionSigningKey` is set, because it then picks a random key on
+  startup.
+- Repeated failed logins from the same IP are slowed down.
+- The cookie is `Secure`, so browsers only send it over HTTPS or
+  `http://localhost`. If the dashboard is served over plain HTTP on another
+  host, set `auth.cookieSecure=false`.
+- The pod reads the Secret at startup. Run `kubectl rollout restart` after
+  rotating an `existingSecret`.
+
+## Configuration
+
+The most common values are below. See
+[`values.yaml`](deploy/helm/argocd-vpa-sync/values.yaml) for the rest
+(resources, security context, scheduling, extra env vars).
+
+| Value | Default | Description |
+|---|---|---|
+| `image.repository` / `image.tag` | `azurebrasil/argocd-vpa-updater` / chart `appVersion` | Container image |
+| `argocd.namespace` | `argocd` | Where Argo CD, its Applications and its repository Secrets live |
+| `ssh.knownHostsConfigMap` | `argocd-ssh-known-hosts-cm` | SSH host keys to trust (a ConfigMap in the release namespace) |
+| `ssh.extraKnownHosts` | `""` | Host keys to trust instead, in `ssh_known_hosts` format |
+| `writeback.pollIntervalSeconds` | `20` | How often queued selections are committed |
+| `auth.admin.passwordHash` | `""` | bcrypt/argon2id hash of the admin password. Setting it turns the login on |
+| `auth.admin.username` | `admin` | Admin username |
+| `auth.existingSecret` | `""` | Secret with `admin.password` (and optionally `server.secretkey`), instead of the two values above |
+| `auth.sessionSigningKey` | `""` | Session signing key (at least 32 characters). Random per pod start when empty |
+| `auth.sessionTTL` | `24h` | Session lifetime |
+| `auth.cookieSecure` | `true` | Only send the session cookie over HTTPS |
+| `ingress.enabled` | `false` | Expose the dashboard through an Ingress |
+| `networkPolicy.enabled` | `false` | Only allow traffic to the HTTP port from `networkPolicy.from` |
+
+## Roadmap
+
+Not supported yet:
+
+- **Opening pull requests.** With `writeBackPolicy: pull-request`, the
+  change is pushed to a new branch, but the pull request itself is not
+  opened. You open it from that branch in GitHub, GitLab or Azure DevOps.
+  With the default, `commit`, the change is pushed directly to the
+  configured branch.
+- **Kustomize patches.** Bindings with `manifestType: kustomize-patch` are
+  accepted but not written yet. Use `helm-values` or `yaml`.
+- **More approval rules.** Today a recommendation is eligible when it
+  differs from the running value by at least `minChangePercent`. Two more
+  rules are planned: warn when an HPA already scales the same workload on
+  CPU, and allow separate thresholds for increases and decreases.
+
+---
+
+## Technical details
+
+### Architecture
 
 ```
 cmd/argocd-vpa-updater/   entry point: wires everything below, runs the
@@ -96,7 +286,7 @@ deploy/helm/argocd-vpa-sync/
 test/integration/         end-to-end test against a real local Git repository
 ```
 
-### Why `git` CLI instead of a pure-Go Git library
+### Why the `git` CLI instead of a pure-Go Git library
 
 `internal/gitrepo` (the read path write-back uses to fetch a file before
 patching it) shells out to the real `git` binary via `internal/gitexec`
@@ -114,7 +304,7 @@ implementation still uses go-git internally, since it only ever operates
 against local (`file://`) repositories in tests, where the incompatibility
 doesn't apply.
 
-### The core contracts
+### Core contracts
 
 | Contract | Package | Purpose |
 |---|---|---|
@@ -125,48 +315,6 @@ doesn't apply.
 | `RepositoryCredentialsProvider` | `internal/credentials` | Resolve Git credentials without duplicating Argo CD's own |
 | `GitWriteBackService` | `internal/gitwriteback` | Branch/commit/PR, idempotently, without force-overwriting conflicts |
 | `StateStore` | `internal/statestore` | Persist small operational state, swappable backend |
-
-## Opting a VPA in
-
-A VPA is only processed if a `VpaGitOpsBinding` CR in the **same namespace**
-references it by name — the CR's existence is the opt-in signal, there is no
-separate "enabled" flag. This mirrors the CRD-based pattern already used by
-this organization's own `argocd-image-updater` fork rather than an
-annotation-based one. Every piece of Git write-back configuration is
-explicit — nothing is inferred from the VPA or Deployment name:
-
-```yaml
-apiVersion: argocd-vpa-updater.argoproj.io/v1alpha1
-kind: VpaGitOpsBinding
-metadata:
-  name: checkout-api-vpa-sync
-  namespace: payments
-spec:
-  vpaRef:
-    name: checkout-api-vpa
-  argoCDApplicationRef:                # optional; only used for a repo-url cross-check warning
-    name: payments-api
-  repoURL: https://git.example.com/team/app.git
-  repoBranch: main
-  writeBackPolicy: pull-request        # commit | pull-request (default: commit)
-  minChangePercent: 10                 # default eligibility threshold; overridable per container
-  containers:
-    - name: app
-      manifestType: helm-values        # helm-values | kustomize-patch | yaml
-      manifestPath: apps/payments/values-prd.yaml
-      cpuKeyPath: resources.requests.cpu
-      memoryKeyPath: resources.requests.memory
-      # never inferred -- omit to leave that limit untouched
-      cpuLimitKeyPath: resources.limits.cpu
-      memoryLimitKeyPath: resources.limits.memory
-```
-
-`containers` is a list, so one binding can configure write-back for more
-than one container of the VPA's target workload. `cpuKeyPath`/`memoryKeyPath`
-support indexing into a container list by name, e.g.
-`spec.template.spec.containers[app].resources.requests.cpu` for a plain
-Deployment manifest; a Helm values file typically uses a plain dotted path
-like `resources.requests.cpu`.
 
 ### Limits
 
@@ -199,7 +347,7 @@ required field, unknown enum value, the referenced VPA not found, or
 `kubectl describe`, alongside the same information surfaced in the
 dashboard.
 
-## Credentials
+### Credentials
 
 `argocd-vpa-updater` never stores its own Git tokens. It reads the
 repository credential Secrets Argo CD already manages, in Argo CD's own
@@ -225,7 +373,7 @@ host Argo CD itself syncs fine — means that ConfigMap needs the host's key
 added on the Argo CD side (`argocd cert add-ssh --batch` or Argo CD's
 Settings → Certificates UI).
 
-## RBAC
+### RBAC
 
 See `deploy/helm/argocd-vpa-sync/templates/rbac-*.yaml` for the exact
 rules. Summary:
@@ -260,18 +408,38 @@ labeled repository-credential Secrets and never logs or returns their
 content (`domain.GitCredentials` redacts itself in every serialization
 path).
 
-## Running locally
+### Upgrading the CRD
+
+Helm installs the `VpaGitOpsBinding` CRD from the chart's `crds/` directory
+on first install but, by design, never upgrades or deletes it. After an
+upgrade that changes the CRD, apply it yourself:
+
+```sh
+helm pull oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync --version <version> --untar
+kubectl apply --server-side -f argocd-vpa-sync/crds/
+```
+
+## Development
+
+### Running locally
 
 ```sh
 go build ./cmd/argocd-vpa-updater
-# needs a cluster with the VPA CRDs installed; see Authentication below to
-# run with a login instead
-KUBECONFIG=... AUTH_ENABLED=false ./argocd-vpa-updater
+# needs a cluster with the VPA CRDs installed
+KUBECONFIG=... ./argocd-vpa-updater
 
 cd web && npm install && npm run dev    # dashboard, proxies /api to :8080
 ```
 
-## Testing
+When run directly, the binary reads these environment variables:
+
+- `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `SESSION_SIGNING_KEY`,
+  `SESSION_TTL`, `COOKIE_SECURE`: the same settings as `auth.*` in the
+  chart.
+- `ARGOCD_NAMESPACE`, `STATE_SECRET_NAMESPACE`, `STATE_SECRET_NAME`,
+  `WRITEBACK_POLL_INTERVAL_SECONDS`, `SSH_KNOWN_HOSTS`, `LISTEN_ADDR`.
+
+### Testing
 
 ```sh
 go build ./... && go vet ./... && go test ./...
@@ -290,96 +458,19 @@ applying a recommendation, replaying it idempotently (no duplicate commit),
 and a genuine concurrent-edit race that must be rejected as a conflict
 without partially writing anything.
 
-## Deploying
-
-The Helm chart is published as an OCI artifact on Docker Hub, and the image
-as `azurebrasil/argocd-vpa-updater` (linux/amd64 and linux/arm64):
-
-```sh
-helm install argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
-  --version 0.1.0 --namespace argocd
-```
-
-Installing into Argo CD's own namespace (`argocd` by default) is the
-simplest option: it lets the pod mount Argo CD's `argocd-ssh-known-hosts-cm`.
-Anywhere else, set `argocd.namespace` to where Argo CD runs and
-`ssh.extraKnownHosts` to the SSH host keys to trust. See
-[`values.yaml`](deploy/helm/argocd-vpa-sync/values.yaml) for every option.
-
-Helm installs the `VpaGitOpsBinding` CRD from the chart's `crds/` directory
-on first install but, by design, never upgrades or deletes it. After an
-upgrade that changes the CRD, apply it yourself:
-
-```sh
-helm pull oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync --version <version> --untar
-kubectl apply --server-side -f argocd-vpa-sync/crds/
-```
-
-### Authentication
-
-Every `/api/` route requires a session from a single local admin account,
-modelled on Argo CD's `admin` user: the password is only ever stored as a
-**bcrypt** or **argon2id** hash, and a login is exchanged for an HMAC-signed
-session token (an `HttpOnly`, `SameSite=Strict` cookie; API clients can send
-the `token` returned by `POST /api/v1/session` as `Authorization: Bearer`).
-Sessions last `auth.sessionTTL` (24h), and changing the password hash
-invalidates every existing session. Failed logins are throttled per client
-IP.
-
-There are three ways to set the password:
-
-1. **Generated (default).** On install the chart generates a random
-   password, stores its bcrypt hash in `<release>-secret`, and the plain
-   text in `<release>-initial-admin-secret`, like Argo CD's
-   `argocd-initial-admin-secret`:
-
-   ```sh
-   kubectl -n argocd get secret argocd-vpa-sync-initial-admin-secret \
-     -o jsonpath='{.data.password}' | base64 -d; echo
-   ```
-
-2. **Your own hash**, via `auth.admin.passwordHash`. The initial-admin
-   Secret is removed once this is set.
-
-   ```sh
-   # bcrypt
-   htpasswd -nbBC 10 "" 'my-password' | tr -d ':\n'
-   argocd account bcrypt --password 'my-password'
-   # argon2id
-   echo -n 'my-password' | argon2 "$(openssl rand -hex 16)" -id -e
-   ```
-
-3. **An existing Secret**, via `auth.existingSecret`, with the keys
-   `admin.password` (the hash) and `server.secretkey` (the session signing
-   key, at least 32 characters). The pod reads it at startup, so run
-   `kubectl rollout restart` after rotating it.
-
-**Deploying the chart with Argo CD** (or any `helm template` flow): Helm's
-`lookup` returns nothing there, so options 1 and 2 would regenerate a
-password or signing key on every render. Use `auth.existingSecret`, or set
-both `auth.admin.passwordHash` and `auth.sessionSigningKey`.
-
-The session cookie is `Secure` by default, so browsers only send it over
-HTTPS (and `http://localhost`, so `kubectl port-forward` works). If the
-dashboard is served over plain HTTP on another host, set
-`auth.cookieSecure=false`.
-
-`auth.enabled=false` disables authentication. The dashboard and the
-endpoints that queue Git commits are then open to anyone who can reach the
-Service, so only use it for local development.
-
-Running the binary directly, the same settings are environment variables:
-`AUTH_ENABLED`, `ADMIN_USERNAME` (`admin`), `ADMIN_PASSWORD_HASH`,
-`SESSION_SIGNING_KEY`, `SESSION_TTL` (`24h`) and `COOKIE_SECURE` (`true`).
-
 ### Releasing
 
 - **Image:** push a `vX.Y.Z` tag. `docker-publish.yml` publishes `X.Y.Z`,
-  `X.Y` and `latest`, and every push to `master` publishes `edge`. Keep the
-  chart's `appVersion` set to the image version it ships.
+  `X.Y` and `latest` for linux/amd64 and linux/arm64, and every push to
+  `master` publishes `edge`. Keep the chart's `appVersion` set to the image
+  version it ships.
 - **Chart:** bump `version` in `deploy/helm/argocd-vpa-sync/Chart.yaml`.
-  `chart-publish.yml` pushes it on merge to `master` and never overwrites a
+  `chart-publish.yml` pushes it on merge to `master`, and never overwrites a
   version that is already published.
 
 Both workflows need the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
 repository secrets.
+
+## License
+
+[MIT](LICENSE)
