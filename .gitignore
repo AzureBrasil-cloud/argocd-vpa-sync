@@ -13,3 +13,7 @@ web/dist/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Claude Code / impeccable
+.claude/settings.local.json
+.claude/skills/impeccable/scripts/bin/
