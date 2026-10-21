@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { getRecommendation, selectRecommendation } from '../api/client'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { getRecommendation, listRecommendations, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
 import { Hint } from '../components/Hint'
+import { Icon } from '../components/Icon'
+import { ResourceReading } from '../components/ResourceReading'
 import { LimitSettingsInput, type LimitResourceCounts } from '../components/LimitSettingsInput'
 import { RequestHeadroomInput } from '../components/RequestHeadroomInput'
 import { UNMANAGED_EXCEEDED_TOOLTIP } from '../components/SelectionSummary'
@@ -14,6 +16,7 @@ import { FORMAT, LIMIT_KEY_PATH, type LimitChange, type LimitResource } from '..
 import { planResource, planSelection, type ResourcePlan } from '../lib/selectionPlan'
 import { useLimitSettings } from '../lib/useLimitSettings'
 import { useRequestHeadroom } from '../lib/useRequestHeadroom'
+import { recommendationPath, rowKey } from '../lib/useRecommendations'
 
 const RESOURCES: LimitResource[] = ['cpu', 'memory']
 
@@ -63,13 +66,20 @@ function boundCell(item: RecommendationDTO, resource: LimitResource, which: 'low
 const WITHIN_BAND_HINT =
   "The VPA recommends a range (lower..upper bound), not just a target, and its target keeps moving. While the " +
   "current request sits inside that range (scaled by the headroom last applied), the workload is sized well " +
-  "enough: changing it again would only chase noise -- the same rule the VPA's own updater uses before " +
+  "enough: changing it again would only chase noise. It is the same rule the VPA's own updater uses before " +
   'restarting a pod. It becomes eligible again once the request falls outside the range.'
 
 function withinBandNote(reasons?: string[]) {
   if (!reasons?.includes('within-vpa-bounds')) return null
   return (
-    <Hint className="within-band" trigger={<span className="badge badge-ok">✓ within VPA range</span>}>
+    <Hint
+      className="within-band"
+      trigger={
+        <span className="badge badge-ok">
+          <Icon name="check" /> within VPA range
+        </span>
+      }
+    >
       {WITHIN_BAND_HINT}
     </Hint>
   )
@@ -90,7 +100,7 @@ function newLimitCell(change: LimitChange | null) {
   if (change.unmanagedExceeded) {
     return (
       <span className="limit-decreases" title={UNMANAGED_EXCEEDED_TOOLTIP}>
-        {change.reason} ⚠
+        <Icon name="warning" /> {change.reason}
       </span>
     )
   }
@@ -98,14 +108,13 @@ function newLimitCell(change: LimitChange | null) {
   if (change.belowRequest) {
     return (
       <span className="limit-below-request" title="Kubernetes rejects a request greater than its limit">
-        {change.next} &lt; request ✕
+        <Icon name="error" /> {change.next} &lt; request
       </span>
     )
   }
   return (
     <span className={change.decreases ? 'limit-decreases' : undefined} title={change.decreases ? 'The limit will be lowered' : undefined}>
-      {change.next}
-      {change.decreases && ' ⚠'}
+      {change.decreases && <Icon name="warning" />} {change.next}
     </span>
   )
 }
@@ -160,6 +169,35 @@ export function RecommendationDetail() {
     return () => clearInterval(id)
   }, [hasInFlightWriteBack, load])
 
+  // j / k step to the next / previous eligible container (in the list's
+  // namespace/VPA order), so a review can walk the eligible set without
+  // going back to the table each time.
+  const navigate = useNavigate()
+  const [eligibleKeys, setEligibleKeys] = useState<RecommendationDTO[]>([])
+  useEffect(() => {
+    listRecommendations()
+      .then((res) => setEligibleKeys(res.items.filter((i) => i.eligible).sort((a, b) => rowKey(a).localeCompare(rowKey(b)))))
+      .catch(() => setEligibleKeys([]))
+  }, [])
+  const currentKey = `${namespace}/${vpaName}/${containerName}`
+  const neighbours = (() => {
+    if (eligibleKeys.length === 0) return { prev: undefined, next: undefined }
+    const after = eligibleKeys.find((i) => rowKey(i) > currentKey)
+    const before = [...eligibleKeys].reverse().find((i) => rowKey(i) < currentKey)
+    return { prev: before, next: after }
+  })()
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement
+      if (target.closest('input, select, textarea, [contenteditable]')) return
+      const to = e.key === 'j' ? neighbours.next : e.key === 'k' ? neighbours.prev : undefined
+      if (to) navigate(recommendationPath(to))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [neighbours.next, neighbours.prev, navigate])
+
   async function handleAccept() {
     if ((!selectCPU && !selectMemory) || limitBlocked) return
     setSelecting(true)
@@ -198,64 +236,106 @@ export function RecommendationDetail() {
     RESOURCES.some((r) => selection[r]?.limitChange?.belowRequest === true)
 
   return (
-    <div>
-      <p>
-        <Link to="/">&larr; Back to list</Link>
-      </p>
+    <div className="page detail">
+      <nav className="detail-nav" aria-label="Recommendation navigation">
+        <Link to="/" className="back-link">
+          <Icon name="arrow-left" /> Recommendations
+        </Link>
+        {(neighbours.prev || neighbours.next) && (
+          <span className="stepper">
+            {neighbours.prev ? (
+              <Link to={recommendationPath(neighbours.prev)} className="btn btn-small">
+                <kbd>k</kbd> Previous eligible
+              </Link>
+            ) : null}
+            {neighbours.next ? (
+              <Link to={recommendationPath(neighbours.next)} className="btn btn-small">
+                Next eligible <kbd>j</kbd>
+              </Link>
+            ) : null}
+          </span>
+        )}
+      </nav>
 
-      {error && <div className="panel panel-error">Failed to load: {error}</div>}
-      {!error && !item && <div className="panel panel-loading">Loading…</div>}
+      {error && (
+        <div className="callout callout-error">
+          <Icon name="error" />
+          <span>Failed to load: {error}</span>
+        </div>
+      )}
+      {!error && !item && <p className="loading">Loading…</p>}
 
       {item && (
-        <div className="panel detail">
-          <div className="detail-header">
+        <>
+          <header className="detail-head">
             <div>
-              <h2>
-                {item.vpaName} <span className="muted">/ {item.containerName}</span>
-              </h2>
-              <p className="muted">
-                {item.namespace} &middot; {item.workload.kind}/{item.workload.name} &middot; VPA mode {item.updateMode}
+              <h1 className="page-title">
+                <span className="vpa-ns">{item.namespace} /</span> {item.vpaName}
+                <span className="detail-container"> · {item.containerName}</span>
+              </h1>
+              <p className="page-sub">
+                {item.workload.kind}/{item.workload.name} · VPA mode {item.updateMode}
               </p>
             </div>
             <StatusBadge status={item.status} operation={item.operation} pill />
+          </header>
+
+          <div className="detail-readings">
+            {RESOURCES.map((r) => (
+              <section key={r} className="detail-reading" aria-label={r === 'cpu' ? 'CPU' : 'Memory'}>
+                <h2 className="detail-reading-title">{r === 'cpu' ? 'CPU request' : 'Memory request'}</h2>
+                <ResourceReading item={item} resource={r} size="detail" />
+              </section>
+            ))}
           </div>
 
           {item.status === 'failed' && item.operation?.errorMessage && (
-            <div className="panel panel-error">
-              <strong>Write-back failed:</strong> {item.operation.errorMessage}
+            <div className="callout callout-error">
+              <Icon name="error" />
+              <span>
+                <strong>Write-back failed:</strong> {item.operation.errorMessage}
+              </span>
             </div>
           )}
 
           {item.status === 'applied' && item.operation?.commitSha && (
-            <p className="muted">
-              Applied to <code>{item.operation.branch}</code> as <code>{item.operation.commitSha.slice(0, 7)}</code>
+            <p className="page-sub">
+              Applied to <code>{item.operation.branch}</code> as <code className="sha">{item.operation.commitSha.slice(0, 7)}</code>
             </p>
           )}
 
           {item.validationErrors && item.validationErrors.length > 0 && (
-            <div className="panel panel-error">
+            <div className="callout callout-error">
+              <Icon name="error" />
+              <div>
               <strong>Invalid configuration:</strong>
               <ul>
                 {item.validationErrors.map((e) => (
                   <li key={e}>{e}</li>
                 ))}
               </ul>
+              </div>
             </div>
           )}
 
           {item.warnings && item.warnings.length > 0 && (
-            <div className="panel panel-warning">
+            <div className="callout callout-warning">
+              <Icon name="warning" />
+              <div>
               <strong>Warnings:</strong>
               <ul>
                 {item.warnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
               </ul>
+              </div>
             </div>
           )}
 
           {unmanagedExceeded.length > 0 && (
-            <div className="panel panel-warning">
+            <div className="callout callout-warning">
+              <Icon name="warning" />
+              <div>
               <strong>Limit below the new request:</strong>
               <ul>
                 {unmanagedExceeded.map((r) => (
@@ -263,22 +343,27 @@ export function RecommendationDetail() {
                     {`new ${r} request ${FORMAT[r](plans![r].request!)} exceeds the current limit ${
                       r === 'cpu' ? formatCPU(item.currentCpuLimit) : formatMemory(item.currentMemoryLimit)
                     }`}
-                    , but the VpaGitOpsBinding sets no <code>{LIMIT_KEY_PATH[r]}</code> -- write-back can't raise
+                    , but the VpaGitOpsBinding sets no <code>{LIMIT_KEY_PATH[r]}</code>, so write-back can't raise
                     the limit, and Kubernetes will reject the new request. Set <code>{LIMIT_KEY_PATH[r]}</code> on the
                     binding, or raise the limit in Git by hand.
                   </li>
                 ))}
               </ul>
+              </div>
             </div>
           )}
 
           {item.currentValueError && (
-            <div className="panel panel-error">
-              <strong>Could not read the current value from the live workload:</strong> {item.currentValueError}
+            <div className="callout callout-error">
+              <Icon name="error" />
+              <span>
+                <strong>Could not read the current value from the live workload:</strong> {item.currentValueError}
+              </span>
             </div>
           )}
 
-          <table className="compare-table">
+          <div className="table-wrap">
+          <table className="data-table compare-table">
             <thead>
               <tr>
                 <th>Select</th>
@@ -339,12 +424,54 @@ export function RecommendationDetail() {
               </tr>
             </tbody>
           </table>
+          </div>
+
+          {item.binding && (
+            <section className="detail-binding" aria-labelledby="detail-binding-title">
+              <h2 id="detail-binding-title">Where write-back commits</h2>
+              <dl className="facts">
+                <div>
+                  <dt>Repository</dt>
+                  <dd className="mono-path">{item.binding.repoURL ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Branch</dt>
+                  <dd>{item.binding.branch ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Manifest</dt>
+                  <dd className="mono-path">
+                    {item.binding.manifestPath ?? '—'}
+                    {item.binding.manifestType && <span className="cell-sub"> ({item.binding.manifestType})</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Request keys</dt>
+                  <dd className="mono-path">
+                    {item.binding.cpuKeyPath ?? 'cpu not set'} · {item.binding.memoryKeyPath ?? 'memory not set'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Limit keys</dt>
+                  <dd className="mono-path">
+                    {item.binding.cpuLimitKeyPath ?? 'cpu not set'} · {item.binding.memoryLimitKeyPath ?? 'memory not set'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Min. change</dt>
+                  <dd>{item.binding.minChangePercent}%</dd>
+                </div>
+              </dl>
+            </section>
+          )}
 
           <div className="detail-actions">
             <EligibilityBadge eligible={item.eligible} reasons={item.eligibilityReasons} />
 
             {item.status === 'selected' && (
-              <span className="badge badge-selected">✓ Queued for write-back</span>
+              <span className="badge badge-selected">
+                <Icon name="check" /> Queued for write-back
+              </span>
             )}
 
             <RequestHeadroomInput settings={headroom} resources={RESOURCES} disabled={selecting} />
@@ -355,15 +482,20 @@ export function RecommendationDetail() {
               onClick={handleAccept}
               disabled={selecting || (!selectCPU && !selectMemory) || limitBlocked}
             >
-              {selecting ? 'Queuing…' : 'Accept selected'}
+              {selecting ? 'Queuing…' : 'Queue selected for write-back'}
             </button>
           </div>
 
-          {selectError && <div className="panel panel-error">Failed to queue selection: {selectError}</div>}
+          {selectError && (
+            <div className="callout callout-error">
+              <Icon name="error" />
+              <span>Failed to queue selection: {selectError}</span>
+            </div>
+          )}
 
-          <p className="muted note">
-            Tick CPU and/or memory above, then Accept to queue them for this project to write back
-            to Git later -- nothing is modified in the VPA, the Deployment, or the cluster directly.
+          <p className="note">
+            Tick CPU and/or memory above, then queue them for this project to write back
+            to Git later. Nothing is modified in the VPA, the Deployment, or the cluster directly.
             The request is written with the request headroom above the recommendation (the
             recommendation becomes (100 − headroom)% of it); once applied, that headroom is remembered
             for this container and later recommendations are compared against recommendation + headroom.
@@ -372,7 +504,7 @@ export function RecommendationDetail() {
             headroom (the new request becomes (100 − headroom)% of the limit) or to an absolute value;
             a limit the manifest doesn't declare is never added.
           </p>
-        </div>
+        </>
       )}
     </div>
   )

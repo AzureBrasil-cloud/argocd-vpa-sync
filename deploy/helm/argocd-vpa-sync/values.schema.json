@@ -32,6 +32,7 @@
         "secretName": { "type": "string" }
       }
     },
+    "theme": { "enum": ["default", "fitting-room", "calibration"] },
     "writeback": {
       "type": "object",
       "properties": {

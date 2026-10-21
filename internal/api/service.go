@@ -204,7 +204,28 @@ func (s *Service) baseDTO(vpa domain.NormalizedVPA, cr domain.ContainerRecommend
 		RecommendationAgeSeconds: ageSeconds,
 		Status:                   statusFor(doc, vpa.Namespace, vpa.Name, cr.ContainerName),
 		Operation:                operationDTOFor(doc, vpa.Namespace, vpa.Name, cr.ContainerName),
+		Binding:                  bindingDTOFor(vpa.Binding, cr.ContainerName),
 	}
+}
+
+func bindingDTOFor(b domain.GitOpsBindingSpec, containerName string) *BindingDTO {
+	dto := &BindingDTO{
+		ArgoCDApplication:          b.ArgoCDApplication,
+		ArgoCDApplicationNamespace: b.ArgoCDApplicationNamespace,
+		RepoURL:                    b.RepoURL,
+		Branch:                     b.RepoBranch,
+		WriteBackPolicy:            string(b.WriteBackPolicy),
+		MinChangePercent:           b.EffectiveMinChangePercent(containerName),
+	}
+	if cc, ok := b.ContainerByName(containerName); ok {
+		dto.ManifestType = string(cc.ManifestType)
+		dto.ManifestPath = cc.ManifestPath
+		dto.CPUKeyPath = cc.CPUKeyPath
+		dto.MemoryKeyPath = cc.MemoryKeyPath
+		dto.CPULimitKeyPath = cc.CPULimitKeyPath
+		dto.MemoryLimitKeyPath = cc.MemoryLimitKeyPath
+	}
+	return dto
 }
 
 func operationDTOFor(doc *domain.StateDocument, namespace, vpaName, containerName string) *OperationDTO {

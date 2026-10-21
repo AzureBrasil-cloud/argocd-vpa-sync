@@ -4,6 +4,7 @@ import type {
   PendingSelectionDTO,
   RecommendationDTO,
   SelectRequest,
+  SettingsDTO,
   UserInfo,
 } from './types'
 
@@ -81,4 +82,8 @@ export function logout(): Promise<void> {
 
 export function getUserInfo(): Promise<UserInfo> {
   return request<UserInfo>(`${SESSION_PATH}/userinfo`)
+}
+
+export function getSettings(): Promise<SettingsDTO> {
+  return request<SettingsDTO>('/api/v1/settings')
 }

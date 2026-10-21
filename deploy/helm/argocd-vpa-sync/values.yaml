@@ -39,6 +39,19 @@ writeback:
   # How often the write-back worker checks for newly queued selections.
   pollIntervalSeconds: 20
 
+# Dashboard theme, chosen at install time. Every theme has the same pages
+# and behavior; only the look changes. Change it with helm upgrade --set
+# theme=<name>; the new pod serves it right away.
+#   default       - the standard admin-console look: left sidebar, blue
+#                   accent, delta badges.
+#   fitting-room  - charcoal navbar, tape-yellow accent, square hairline
+#                   tables; each CPU/memory cell is a tape-measure gauge
+#                   (VPA range, current request, recommendation).
+#   calibration   - ink header band with a summary strip, seal-blue accent;
+#                   each CPU/memory cell is a tolerance bar with an IN/OUT
+#                   verdict, and the queue previews the values diff.
+theme: default
+
 # Optional admin login, in the style of Argo CD's admin user. With neither
 # auth.admin.passwordHash nor auth.existingSecret set there is no login: the
 # dashboard -- including the actions that queue Git commits -- is open to

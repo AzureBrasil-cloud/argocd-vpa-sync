@@ -1,0 +1,172 @@
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Icon } from '../components/Icon'
+import { StatusBadge } from '../components/StatusBadge'
+import { ageSince, formatWhen, useNow } from '../lib/time'
+import { shortRepo } from '../lib/format'
+import { recommendationPath, rowKey, useRecommendations } from '../lib/useRecommendations'
+
+type Filter = 'all' | 'applied' | 'failed' | 'in-flight'
+
+/** A PR link or a commit page on the common Git hosts, when the repo URL allows one. */
+function commitURL(repoURL: string | undefined, sha: string): string | null {
+  if (!repoURL) return null
+  const https = repoURL
+    .replace(/^git@([^:]+):/, 'https://$1/')
+    .replace(/^ssh:\/\/git@([^/]+)\//, 'https://$1/')
+    .replace(/\.git$/, '')
+  if (!https.startsWith('https://')) return null
+  if (/github\.com|gitlab\.com/.test(https)) return `${https}/commit/${sha}`
+  return null
+}
+
+/**
+ * The latest write-back per container: what was committed, where, and
+ * when -- or why it failed. The state store keeps only the most recent
+ * attempt for each container, so this is not a full audit log; Git history
+ * is.
+ */
+export function History() {
+  const { items, error } = useRecommendations()
+  const now = useNow()
+  const [filter, setFilter] = useState<Filter>('all')
+
+  const entries = useMemo(
+    () =>
+      (items ?? [])
+        .filter((item) => item.operation || item.status === 'selected' || item.status === 'applying')
+        .sort((a, b) => (b.operation?.updatedAt ?? '').localeCompare(a.operation?.updatedAt ?? '')),
+    [items],
+  )
+
+  const counts = {
+    all: entries.length,
+    applied: entries.filter((e) => e.status === 'applied').length,
+    failed: entries.filter((e) => e.status === 'failed').length,
+    'in-flight': entries.filter((e) => e.status === 'selected' || e.status === 'applying').length,
+  }
+  const shown = entries.filter((e) =>
+    filter === 'all' ? true : filter === 'in-flight' ? e.status === 'selected' || e.status === 'applying' : e.status === filter,
+  )
+
+  return (
+    <div className="page">
+      <header className="page-head">
+        <h1 className="page-title">Write-back history</h1>
+        <p className="page-sub">
+          The latest write-back for each container, newest first. Git keeps the full history of every commit.
+        </p>
+      </header>
+
+      {error && (
+        <div className="callout callout-error">
+          <Icon name="error" />
+          <span>Failed to load write-backs: {error}</span>
+        </div>
+      )}
+      {!error && items === null && <p className="loading">Loading write-backs…</p>}
+
+      {items && (
+        <>
+          <div className="filters">
+            <div className="segmented" role="group" aria-label="Write-back status">
+              {(
+                [
+                  ['all', 'All'],
+                  ['applied', 'Applied'],
+                  ['failed', 'Failed'],
+                  ['in-flight', 'In flight'],
+                ] as const
+              ).map(([value, label]) => (
+                <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
+                  {label} <span className="count">{counts[value]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {shown.length === 0 ? (
+            <div className="empty">
+              <h2>{entries.length === 0 ? 'No write-backs yet' : 'Nothing in this filter'}</h2>
+              <p>
+                {entries.length === 0
+                  ? 'Select changes on Recommendations and apply them; each one shows up here once the worker commits it.'
+                  : 'Pick another status above.'}
+              </p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Status</th>
+                    <th>VPA · namespace</th>
+                    <th>Repository · branch</th>
+                    <th>Commit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((item) => {
+                    const op = item.operation
+                    const url = op?.commitSha ? commitURL(item.binding?.repoURL, op.commitSha) : null
+                    return (
+                      <tr key={rowKey(item)}>
+                        <td className="nowrap">
+                          {op?.updatedAt ? (
+                            <>
+                              <span className="num">{formatWhen(op.updatedAt)}</span>
+                              <span className="cell-sub">{ageSince(op.updatedAt, now)}</span>
+                            </>
+                          ) : (
+                            <span className="cell-sub">waiting for the worker</span>
+                          )}
+                        </td>
+                        <td>
+                          <StatusBadge status={item.status} operation={op} />
+                        </td>
+                        <td>
+                          <Link className="vpa-link" to={recommendationPath(item)} title={`${item.namespace}/${item.vpaName}`}>
+                            {item.vpaName}
+                          </Link>
+                          <span className="vpa-meta">
+                            {item.namespace} · {item.workload.kind} · {item.containerName}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="repo" title={item.binding?.repoURL}>
+                            {shortRepo(item.binding?.repoURL)}
+                          </span>
+                          <span className="cell-sub">{op?.branch ?? item.binding?.branch ?? ''}</span>
+                        </td>
+                        <td>
+                          {op?.prUrl ? (
+                            <a href={op.prUrl} target="_blank" rel="noreferrer" className="ext-link">
+                              Pull request <Icon name="external" />
+                            </a>
+                          ) : op?.commitSha ? (
+                            url ? (
+                              <a href={url} target="_blank" rel="noreferrer" className="ext-link">
+                                <code className="sha">{op.commitSha.slice(0, 7)}</code> <Icon name="external" />
+                              </a>
+                            ) : (
+                              <code className="sha">{op.commitSha.slice(0, 7)}</code>
+                            )
+                          ) : op?.errorMessage ? (
+                            <span className="text-bad error-text">{op.errorMessage}</span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

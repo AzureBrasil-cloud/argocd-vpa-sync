@@ -8,7 +8,7 @@ function Tooltip() {
   return (
     <>
       <strong>Why?</strong> The VPA recommends what the pod actually uses. Written as-is, the request equals that
-      usage, so a pod merely at rest already runs at ~100% of its request -- and an HPA, which scales on a
+      usage, so a pod merely at rest already runs at ~100% of its request, and an HPA, which scales on a
       percentage of the request, scales it out for no reason.
       <br />
       <br />
@@ -28,13 +28,15 @@ interface RequestHeadroomInputProps {
   /** Only these resources get a row (e.g. just memory when only memory is selected). */
   resources: LimitResource[]
   disabled?: boolean
+  /** Leave out the "off" explanation (the tooltip still has it), e.g. in the narrow queue panel. */
+  compact?: boolean
 }
 
 /**
  * Per-resource, optional headroom the new request is written with over the
  * VPA recommendation: a checkbox turns it on, revealing the percentage.
  */
-export function RequestHeadroomInput({ settings, resources, disabled }: RequestHeadroomInputProps) {
+export function RequestHeadroomInput({ settings, resources, disabled, compact }: RequestHeadroomInputProps) {
   if (resources.length === 0) return null
 
   return (
@@ -80,8 +82,10 @@ export function RequestHeadroomInput({ settings, resources, disabled }: RequestH
                 <span>%</span>
                 {!valid && <span className="limit-settings-error">must be ≥ 0 and &lt; 100</span>}
               </>
+            ) : compact ? (
+              <span className="muted">off</span>
             ) : (
-              <span className="muted">off -- writes the bare VPA recommendation</span>
+              <span className="muted">off: writes the bare VPA recommendation</span>
             )}
           </div>
         )

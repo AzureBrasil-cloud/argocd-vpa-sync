@@ -1,0 +1,1224 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T15:18:43+00:00",
+  "title": "Design System: argocd-vpa-sync",
+  "extensions": {
+    "themes": [
+      {
+        "name": "default",
+        "displayName": "Default",
+        "selector": ":root[data-theme='default'] (also bare :root)",
+        "shell": "208px sticky left sidebar",
+        "signature": "Delta badges"
+      },
+      {
+        "name": "fitting-room",
+        "displayName": "The Fitting Room",
+        "selector": ":root[data-theme='fitting-room']",
+        "shell": "48px charcoal top navbar",
+        "signature": "Tape-measure gauge; queue as alteration ticket"
+      },
+      {
+        "name": "calibration",
+        "displayName": "Calibration Certificate",
+        "selector": ":root[data-theme='calibration']",
+        "shell": "48px ink top navbar + identification strip",
+        "signature": "Tolerance bar + IN/OUT verdict; values diff in the queue; serial row numbers"
+      }
+    ],
+    "colorMeta": {
+      "default-bg": {
+        "role": "neutral",
+        "displayName": "Default Ground",
+        "theme": "default",
+        "cssVar": "--bg",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#7d7d7d",
+          "#9e9e9e",
+          "#c4c4c4",
+          "#eeeeee"
+        ]
+      },
+      "default-surface-2": {
+        "role": "neutral",
+        "displayName": "Default Raised Ground",
+        "theme": "default",
+        "cssVar": "--surface-2",
+        "canonical": "#f1f5f9",
+        "tonalRamp": [
+          "#090b0e",
+          "#212427",
+          "#3d4043",
+          "#5b5e61",
+          "#7a7e81",
+          "#9b9fa2",
+          "#c1c5c8",
+          "#ebeff3"
+        ]
+      },
+      "default-ink": {
+        "role": "neutral",
+        "displayName": "Default Ink",
+        "theme": "default",
+        "cssVar": "--ink",
+        "canonical": "#0f172a",
+        "tonalRamp": [
+          "#040a1c",
+          "#1b2337",
+          "#363f55",
+          "#535d75",
+          "#727d96",
+          "#939eb8",
+          "#b9c4dc",
+          "#e5efff"
+        ]
+      },
+      "default-ink-2": {
+        "role": "neutral",
+        "displayName": "Default Ink Secondary",
+        "theme": "default",
+        "cssVar": "--ink-2",
+        "canonical": "#334155",
+        "tonalRamp": [
+          "#020b1b",
+          "#182437",
+          "#334155",
+          "#505f74",
+          "#6f7e95",
+          "#8fa0b7",
+          "#b4c6de",
+          "#dff0ff"
+        ]
+      },
+      "default-ink-3": {
+        "role": "neutral",
+        "displayName": "Default Ink Muted",
+        "theme": "default",
+        "cssVar": "--ink-3",
+        "canonical": "#5b6474",
+        "tonalRamp": [
+          "#050b17",
+          "#1d2432",
+          "#38404f",
+          "#555e6e",
+          "#747e8e",
+          "#959fb0",
+          "#bac5d7",
+          "#e4efff"
+        ]
+      },
+      "default-line": {
+        "role": "neutral",
+        "displayName": "Default Hairline",
+        "theme": "default",
+        "cssVar": "--line",
+        "canonical": "#e2e8f0",
+        "tonalRamp": [
+          "#080b10",
+          "#20242a",
+          "#3b4046",
+          "#595e65",
+          "#787e85",
+          "#999fa6",
+          "#bfc5cc",
+          "#e9eff7"
+        ]
+      },
+      "default-line-strong": {
+        "role": "neutral",
+        "displayName": "Default Strong Hairline",
+        "theme": "default",
+        "cssVar": "--line-strong",
+        "canonical": "#cbd5e1",
+        "tonalRamp": [
+          "#060c13",
+          "#1d252e",
+          "#38414a",
+          "#565f69",
+          "#757e89",
+          "#969fab",
+          "#bbc5d1",
+          "#e5f0fc"
+        ]
+      },
+      "default-accent": {
+        "role": "primary",
+        "displayName": "Console Blue",
+        "theme": "default",
+        "cssVar": "--accent",
+        "canonical": "#2563eb",
+        "tonalRamp": [
+          "#030049",
+          "#000776",
+          "#002ca5",
+          "#104dd4",
+          "#3271fa",
+          "#5897ff",
+          "#86c1ff",
+          "#b9eeff"
+        ]
+      },
+      "default-accent-hover": {
+        "role": "primary",
+        "displayName": "Default Accent Hover",
+        "theme": "default",
+        "cssVar": "--accent-hover",
+        "canonical": "#1d4ed8",
+        "tonalRamp": [
+          "#07004f",
+          "#02007c",
+          "#0325ac",
+          "#1b4bd5",
+          "#3970fb",
+          "#6197ff",
+          "#8ec0ff",
+          "#c0edff"
+        ]
+      },
+      "default-accent-soft": {
+        "role": "primary",
+        "displayName": "Default Accent Tint",
+        "theme": "default",
+        "cssVar": "--accent-soft",
+        "canonical": "#eff6ff",
+        "tonalRamp": [
+          "#070b11",
+          "#1f242b",
+          "#3b4047",
+          "#585e66",
+          "#787e86",
+          "#999fa7",
+          "#bec5cd",
+          "#e8eff8"
+        ]
+      },
+      "default-ok": {
+        "role": "tertiary",
+        "displayName": "Default Eligible Green",
+        "theme": "default",
+        "cssVar": "--ok",
+        "canonical": "#15803d",
+        "tonalRamp": [
+          "#001400",
+          "#003200",
+          "#00520f",
+          "#00722f",
+          "#31934f",
+          "#59b571",
+          "#8bda9c",
+          "#bfffcc"
+        ]
+      },
+      "default-ok-soft": {
+        "role": "tertiary",
+        "displayName": "Default Eligible Tint",
+        "theme": "default",
+        "cssVar": "--ok-soft",
+        "canonical": "#dcfce7",
+        "tonalRamp": [
+          "#020f07",
+          "#16291d",
+          "#2f4638",
+          "#4a6554",
+          "#688573",
+          "#89a794",
+          "#aecdb9",
+          "#d8f8e3"
+        ]
+      },
+      "default-warn": {
+        "role": "tertiary",
+        "displayName": "Default Warning Amber",
+        "theme": "default",
+        "cssVar": "--warn",
+        "canonical": "#a14b06",
+        "tonalRamp": [
+          "#280000",
+          "#4c0100",
+          "#732000",
+          "#964100",
+          "#ba6229",
+          "#dd8550",
+          "#ffae81",
+          "#ffddb5"
+        ]
+      },
+      "default-warn-soft": {
+        "role": "tertiary",
+        "displayName": "Default Warning Tint",
+        "theme": "default",
+        "cssVar": "--warn-soft",
+        "canonical": "#ffedd5",
+        "tonalRamp": [
+          "#120901",
+          "#2d2212",
+          "#4b3d2a",
+          "#6a5b46",
+          "#8b7b65",
+          "#ac9c85",
+          "#d3c1aa",
+          "#feecd4"
+        ]
+      },
+      "default-bad": {
+        "role": "tertiary",
+        "displayName": "Default Failure Red",
+        "theme": "default",
+        "cssVar": "--bad",
+        "canonical": "#b91c1c",
+        "tonalRamp": [
+          "#330000",
+          "#5c0000",
+          "#880000",
+          "#b00c13",
+          "#d73f37",
+          "#f76c60",
+          "#ff9b8d",
+          "#ffcec0"
+        ]
+      },
+      "default-bad-soft": {
+        "role": "tertiary",
+        "displayName": "Default Failure Tint",
+        "theme": "default",
+        "cssVar": "--bad-soft",
+        "canonical": "#fee2e2",
+        "tonalRamp": [
+          "#150707",
+          "#311e1f",
+          "#4f393a",
+          "#6e5757",
+          "#8f7676",
+          "#b19797",
+          "#d8bdbd",
+          "#ffe7e7"
+        ]
+      },
+      "default-band": {
+        "role": "neutral",
+        "displayName": "Default VPA Range Band",
+        "theme": "default",
+        "cssVar": "--band",
+        "canonical": "#dbe3ee",
+        "tonalRamp": [
+          "#070b12",
+          "#1f242c",
+          "#3a4049",
+          "#575e68",
+          "#777e88",
+          "#989fa9",
+          "#bdc5d0",
+          "#e7effa"
+        ]
+      },
+      "fitting-room-bg": {
+        "role": "neutral",
+        "displayName": "Fitting Room Ground",
+        "theme": "fitting-room",
+        "cssVar": "--bg",
+        "canonical": "#f6f7f5",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#242423",
+          "#3f403e",
+          "#5d5e5c",
+          "#7d7d7c",
+          "#9e9f9d",
+          "#c3c4c2",
+          "#eeefed"
+        ]
+      },
+      "fitting-room-surface": {
+        "role": "neutral",
+        "displayName": "Fitting Room Surface",
+        "theme": "fitting-room",
+        "cssVar": "--surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#7d7d7d",
+          "#9e9e9e",
+          "#c4c4c4",
+          "#eeeeee"
+        ]
+      },
+      "fitting-room-surface-2": {
+        "role": "neutral",
+        "displayName": "Fitting Room Raised Ground",
+        "theme": "fitting-room",
+        "cssVar": "--surface-2",
+        "canonical": "#eceee9",
+        "tonalRamp": [
+          "#0a0c09",
+          "#232521",
+          "#3f403c",
+          "#5d5e5a",
+          "#7c7e79",
+          "#9d9f9a",
+          "#c3c5c0",
+          "#edefea"
+        ]
+      },
+      "fitting-room-ink": {
+        "role": "neutral",
+        "displayName": "Fitting Room Ink",
+        "theme": "fitting-room",
+        "cssVar": "--ink",
+        "canonical": "#1d1f23",
+        "tonalRamp": [
+          "#090b0f",
+          "#222428",
+          "#3d4044",
+          "#5b5e62",
+          "#7b7d82",
+          "#9c9ea4",
+          "#c1c4ca",
+          "#eceef4"
+        ]
+      },
+      "fitting-room-ink-2": {
+        "role": "neutral",
+        "displayName": "Fitting Room Ink Secondary",
+        "theme": "fitting-room",
+        "cssVar": "--ink-2",
+        "canonical": "#3f444b",
+        "tonalRamp": [
+          "#080b11",
+          "#20242b",
+          "#3b4047",
+          "#595e65",
+          "#787e86",
+          "#999fa7",
+          "#bfc5cd",
+          "#e9eff8"
+        ]
+      },
+      "fitting-room-ink-3": {
+        "role": "neutral",
+        "displayName": "Fitting Room Ink Muted",
+        "theme": "fitting-room",
+        "cssVar": "--ink-3",
+        "canonical": "#61666e",
+        "tonalRamp": [
+          "#080b11",
+          "#20242b",
+          "#3b4047",
+          "#595e66",
+          "#787e86",
+          "#999fa7",
+          "#bfc4cd",
+          "#e9eff8"
+        ]
+      },
+      "fitting-room-line": {
+        "role": "neutral",
+        "displayName": "Fitting Room Hairline",
+        "theme": "fitting-room",
+        "cssVar": "--line",
+        "canonical": "#d9dcd6",
+        "tonalRamp": [
+          "#0a0c08",
+          "#232520",
+          "#3e413c",
+          "#5c5f59",
+          "#7c7e79",
+          "#9d9f9a",
+          "#c2c5bf",
+          "#edf0ea"
+        ]
+      },
+      "fitting-room-charcoal": {
+        "role": "neutral",
+        "displayName": "Fitting Room Charcoal Shell",
+        "theme": "fitting-room",
+        "cssVar": "--shell-bg / --line-strong / --head-rule",
+        "canonical": "#23262b",
+        "tonalRamp": [
+          "#090b10",
+          "#212429",
+          "#3d4045",
+          "#5a5e64",
+          "#7a7d84",
+          "#9b9fa5",
+          "#c0c4cb",
+          "#ebeff6"
+        ]
+      },
+      "fitting-room-accent": {
+        "role": "primary",
+        "displayName": "Tape Yellow",
+        "theme": "fitting-room",
+        "cssVar": "--accent",
+        "canonical": "#f2c230",
+        "tonalRamp": [
+          "#170700",
+          "#352000",
+          "#563b00",
+          "#795800",
+          "#9f7700",
+          "#c69700",
+          "#edbd28",
+          "#ffe861"
+        ]
+      },
+      "fitting-room-accent-hover": {
+        "role": "primary",
+        "displayName": "Fitting Room Accent Hover",
+        "theme": "fitting-room",
+        "cssVar": "--accent-hover",
+        "canonical": "#e3b11c",
+        "tonalRamp": [
+          "#180600",
+          "#371e00",
+          "#583900",
+          "#7c5600",
+          "#a27500",
+          "#c79600",
+          "#efbc31",
+          "#ffe86d"
+        ]
+      },
+      "fitting-room-accent-soft": {
+        "role": "primary",
+        "displayName": "Fitting Room Accent Tint",
+        "theme": "fitting-room",
+        "cssVar": "--accent-soft",
+        "canonical": "#fbf1cc",
+        "tonalRamp": [
+          "#0f0b00",
+          "#29240f",
+          "#464027",
+          "#665e40",
+          "#867d5c",
+          "#a89f7c",
+          "#cec4a1",
+          "#f9efca"
+        ]
+      },
+      "fitting-room-ok": {
+        "role": "tertiary",
+        "displayName": "Fitting Room Eligible Green",
+        "theme": "fitting-room",
+        "cssVar": "--ok",
+        "canonical": "#2e7d4f",
+        "tonalRamp": [
+          "#001400",
+          "#00300b",
+          "#004f24",
+          "#1c6f42",
+          "#429060",
+          "#65b281",
+          "#92d7a9",
+          "#c4ffd7"
+        ]
+      },
+      "fitting-room-ok-soft": {
+        "role": "tertiary",
+        "displayName": "Fitting Room Eligible Tint",
+        "theme": "fitting-room",
+        "cssVar": "--ok-soft",
+        "canonical": "#dcefe3",
+        "tonalRamp": [
+          "#030e07",
+          "#19281f",
+          "#35443b",
+          "#526258",
+          "#718278",
+          "#92a498",
+          "#b7c9be",
+          "#e1f4e8"
+        ]
+      },
+      "fitting-room-warn": {
+        "role": "tertiary",
+        "displayName": "Fitting Room Warning Amber",
+        "theme": "fitting-room",
+        "cssVar": "--warn",
+        "canonical": "#8a5d00",
+        "tonalRamp": [
+          "#1e0200",
+          "#3e1900",
+          "#5f3500",
+          "#805300",
+          "#a27326",
+          "#c5954b",
+          "#e8bc7d",
+          "#ffe8b2"
+        ]
+      },
+      "fitting-room-bad": {
+        "role": "tertiary",
+        "displayName": "Fitting Room Failure Red",
+        "theme": "fitting-room",
+        "cssVar": "--bad",
+        "canonical": "#c8372d",
+        "tonalRamp": [
+          "#2f0000",
+          "#580000",
+          "#830000",
+          "#ad1713",
+          "#d44338",
+          "#f96b5c",
+          "#ff9a8a",
+          "#ffccbc"
+        ]
+      },
+      "fitting-room-bad-soft": {
+        "role": "tertiary",
+        "displayName": "Fitting Room Failure Tint",
+        "theme": "fitting-room",
+        "cssVar": "--bad-soft",
+        "canonical": "#f8dfdc",
+        "tonalRamp": [
+          "#150706",
+          "#301f1d",
+          "#4e3a38",
+          "#6d5855",
+          "#8d7775",
+          "#af9895",
+          "#d6bebb",
+          "#ffe8e5"
+        ]
+      },
+      "fitting-room-rec": {
+        "role": "secondary",
+        "displayName": "Chalk Blue",
+        "theme": "fitting-room",
+        "cssVar": "--rec",
+        "canonical": "#3b6fb6",
+        "tonalRamp": [
+          "#000432",
+          "#002057",
+          "#063d7f",
+          "#295da2",
+          "#497ec6",
+          "#6aa0eb",
+          "#96c7ff",
+          "#c6f2ff"
+        ]
+      },
+      "fitting-room-band": {
+        "role": "neutral",
+        "displayName": "Fitting Room VPA Range Band",
+        "theme": "fitting-room",
+        "cssVar": "--band",
+        "canonical": "#dcdfd9",
+        "tonalRamp": [
+          "#0a0c08",
+          "#232520",
+          "#3e413c",
+          "#5c5f59",
+          "#7c7e79",
+          "#9d9f9a",
+          "#c2c5bf",
+          "#edf0ea"
+        ]
+      },
+      "fitting-room-shell-ink-2": {
+        "role": "neutral",
+        "displayName": "Fitting Room Shell Ink Muted",
+        "theme": "fitting-room",
+        "cssVar": "--shell-ink-2",
+        "canonical": "#b4b9c0",
+        "tonalRamp": [
+          "#080b10",
+          "#21242a",
+          "#3c4046",
+          "#5a5e64",
+          "#797e84",
+          "#9a9fa6",
+          "#bfc4cc",
+          "#eaeff6"
+        ]
+      },
+      "fitting-room-shell-line": {
+        "role": "neutral",
+        "displayName": "Fitting Room Shell Hairline",
+        "theme": "fitting-room",
+        "cssVar": "--shell-line",
+        "canonical": "#3a3e45",
+        "tonalRamp": [
+          "#080b11",
+          "#20242b",
+          "#3c4047",
+          "#595e65",
+          "#797d85",
+          "#9a9fa7",
+          "#bfc4cd",
+          "#eaeff8"
+        ]
+      },
+      "calibration-bg": {
+        "role": "neutral",
+        "displayName": "Calibration Ground",
+        "theme": "calibration",
+        "cssVar": "--bg",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#7d7d7d",
+          "#9e9e9e",
+          "#c4c4c4",
+          "#eeeeee"
+        ]
+      },
+      "calibration-surface-2": {
+        "role": "neutral",
+        "displayName": "Calibration Raised Ground",
+        "theme": "calibration",
+        "cssVar": "--surface-2",
+        "canonical": "#f3f5f8",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232426",
+          "#3e4042",
+          "#5c5e60",
+          "#7c7d80",
+          "#9d9ea1",
+          "#c2c4c7",
+          "#edeff1"
+        ]
+      },
+      "calibration-ink": {
+        "role": "neutral",
+        "displayName": "Certificate Ink",
+        "theme": "calibration",
+        "cssVar": "--ink / --shell-bg / --line-strong / --head-rule",
+        "canonical": "#1c2430",
+        "tonalRamp": [
+          "#050b16",
+          "#1c2430",
+          "#38404d",
+          "#555e6c",
+          "#747e8d",
+          "#959faf",
+          "#bac5d5",
+          "#e4efff"
+        ]
+      },
+      "calibration-ink-2": {
+        "role": "neutral",
+        "displayName": "Calibration Ink Secondary",
+        "theme": "calibration",
+        "cssVar": "--ink-2",
+        "canonical": "#3c4857",
+        "tonalRamp": [
+          "#040b17",
+          "#1a2532",
+          "#354150",
+          "#525f6f",
+          "#717f8f",
+          "#92a0b1",
+          "#b7c6d8",
+          "#e1f0ff"
+        ]
+      },
+      "calibration-ink-3": {
+        "role": "neutral",
+        "displayName": "Calibration Ink Muted",
+        "theme": "calibration",
+        "cssVar": "--ink-3",
+        "canonical": "#5b6b7c",
+        "tonalRamp": [
+          "#020c18",
+          "#172534",
+          "#324151",
+          "#505f70",
+          "#6f7f91",
+          "#8fa0b3",
+          "#b4c6d9",
+          "#def1ff"
+        ]
+      },
+      "calibration-line": {
+        "role": "neutral",
+        "displayName": "Calibration Hairline",
+        "theme": "calibration",
+        "cssVar": "--line",
+        "canonical": "#dde3ea",
+        "tonalRamp": [
+          "#080c10",
+          "#20242a",
+          "#3b4046",
+          "#595e64",
+          "#787e84",
+          "#999fa6",
+          "#bfc5cc",
+          "#e9eff6"
+        ]
+      },
+      "calibration-accent": {
+        "role": "primary",
+        "displayName": "Seal Blue",
+        "theme": "calibration",
+        "cssVar": "--accent",
+        "canonical": "#2348a8",
+        "tonalRamp": [
+          "#020042",
+          "#01116c",
+          "#133493",
+          "#2e55b7",
+          "#4e78d9",
+          "#739bf4",
+          "#9ec3ff",
+          "#ceeeff"
+        ]
+      },
+      "calibration-accent-hover": {
+        "role": "primary",
+        "displayName": "Calibration Accent Hover",
+        "theme": "calibration",
+        "cssVar": "--accent-hover",
+        "canonical": "#1b3a8c",
+        "tonalRamp": [
+          "#020040",
+          "#031567",
+          "#193789",
+          "#3558ac",
+          "#567acb",
+          "#7a9de7",
+          "#a4c4ff",
+          "#d4efff"
+        ]
+      },
+      "calibration-accent-soft": {
+        "role": "primary",
+        "displayName": "Calibration Accent Tint",
+        "theme": "calibration",
+        "cssVar": "--accent-soft",
+        "canonical": "#edf1fb",
+        "tonalRamp": [
+          "#090b11",
+          "#21242b",
+          "#3c4047",
+          "#5a5d66",
+          "#7a7d86",
+          "#9b9ea7",
+          "#c0c4ce",
+          "#eaeef8"
+        ]
+      },
+      "calibration-shell-mark": {
+        "role": "secondary",
+        "displayName": "Pale Seal",
+        "theme": "calibration",
+        "cssVar": "(literal #8fa8e8 in calibration logo band and active nav)",
+        "canonical": "#8fa8e8",
+        "tonalRamp": [
+          "#030824",
+          "#152146",
+          "#2d3d6b",
+          "#475b92",
+          "#647bb8",
+          "#849cdc",
+          "#a8c2ff",
+          "#d2edff"
+        ]
+      },
+      "calibration-ok": {
+        "role": "tertiary",
+        "displayName": "Calibration Eligible Green",
+        "theme": "calibration",
+        "cssVar": "--ok",
+        "canonical": "#1f7a4d",
+        "tonalRamp": [
+          "#001400",
+          "#00310c",
+          "#005026",
+          "#0d6f43",
+          "#3a9162",
+          "#5fb382",
+          "#8ed7ab",
+          "#c1ffd8"
+        ]
+      },
+      "calibration-ok-soft": {
+        "role": "tertiary",
+        "displayName": "Calibration Eligible Tint",
+        "theme": "calibration",
+        "cssVar": "--ok-soft",
+        "canonical": "#e3f2ea",
+        "tonalRamp": [
+          "#040e09",
+          "#1c2721",
+          "#37433d",
+          "#54615a",
+          "#74817a",
+          "#94a29b",
+          "#bac8c0",
+          "#e4f3eb"
+        ]
+      },
+      "calibration-warn": {
+        "role": "tertiary",
+        "displayName": "Calibration Warning Amber",
+        "theme": "calibration",
+        "cssVar": "--warn",
+        "canonical": "#8a5a00",
+        "tonalRamp": [
+          "#1f0100",
+          "#3f1700",
+          "#613300",
+          "#815200",
+          "#a47228",
+          "#c7944d",
+          "#e9bb7e",
+          "#ffe7b3"
+        ]
+      },
+      "calibration-warn-soft": {
+        "role": "tertiary",
+        "displayName": "Calibration Warning Tint",
+        "theme": "calibration",
+        "cssVar": "--warn-soft",
+        "canonical": "#fbf0d9",
+        "tonalRamp": [
+          "#100a01",
+          "#2b2313",
+          "#483f2c",
+          "#665d49",
+          "#867c68",
+          "#a89d88",
+          "#cec3ad",
+          "#f8edd6"
+        ]
+      },
+      "calibration-bad": {
+        "role": "tertiary",
+        "displayName": "Vermilion",
+        "theme": "calibration",
+        "cssVar": "--bad",
+        "canonical": "#b8391f",
+        "tonalRamp": [
+          "#2e0000",
+          "#560000",
+          "#800000",
+          "#a7280b",
+          "#cd4d33",
+          "#f0745a",
+          "#ffa188",
+          "#ffd2bb"
+        ]
+      },
+      "calibration-bad-soft": {
+        "role": "tertiary",
+        "displayName": "Calibration Failure Tint",
+        "theme": "calibration",
+        "cssVar": "--bad-soft",
+        "canonical": "#fbe6e1",
+        "tonalRamp": [
+          "#140705",
+          "#2f201c",
+          "#4c3b37",
+          "#6b5955",
+          "#8b7874",
+          "#ad9995",
+          "#d3bfba",
+          "#fee9e4"
+        ]
+      },
+      "calibration-band": {
+        "role": "neutral",
+        "displayName": "Calibration VPA Range Band",
+        "theme": "calibration",
+        "cssVar": "--band",
+        "canonical": "#d3dbe4",
+        "tonalRamp": [
+          "#070c11",
+          "#1f252b",
+          "#3a4048",
+          "#585e66",
+          "#777e86",
+          "#989fa8",
+          "#bdc5ce",
+          "#e7eff9"
+        ]
+      },
+      "calibration-shell-ink-2": {
+        "role": "neutral",
+        "displayName": "Calibration Shell Ink Muted",
+        "theme": "calibration",
+        "cssVar": "--shell-ink-2",
+        "canonical": "#aeb8c4",
+        "tonalRamp": [
+          "#060c14",
+          "#1d252e",
+          "#38414b",
+          "#565f69",
+          "#757e89",
+          "#969fab",
+          "#bbc5d1",
+          "#e5f0fc"
+        ]
+      },
+      "calibration-shell-line": {
+        "role": "neutral",
+        "displayName": "Calibration Shell Hairline",
+        "theme": "calibration",
+        "cssVar": "--shell-line",
+        "canonical": "#313c4b",
+        "tonalRamp": [
+          "#040b18",
+          "#1a2533",
+          "#354150",
+          "#535f6f",
+          "#727e8f",
+          "#93a0b1",
+          "#b8c5d8",
+          "#e2f0ff"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "default-title": {
+        "displayName": "Default Title",
+        "purpose": "Page titles in the default variant."
+      },
+      "default-body": {
+        "displayName": "Default Body",
+        "purpose": "Table cells and prose, platform stack, tabular figures."
+      },
+      "default-label": {
+        "displayName": "Default Label",
+        "purpose": "Table headers and fact terms, sentence case."
+      },
+      "fitting-room-title": {
+        "displayName": "Fitting-room Title",
+        "purpose": "Page titles, Archivo condensed to 92% width."
+      },
+      "fitting-room-body": {
+        "displayName": "Fitting-room Body",
+        "purpose": "Table cells and prose in Archivo."
+      },
+      "fitting-room-label": {
+        "displayName": "Fitting-room Label",
+        "purpose": "Uppercase tracked headers, like tape printing."
+      },
+      "calibration-title": {
+        "displayName": "Calibration Title",
+        "purpose": "Page titles off the list page (the list uses the id strip)."
+      },
+      "calibration-body": {
+        "displayName": "Calibration Body",
+        "purpose": "Table cells and prose in Public Sans."
+      },
+      "calibration-label": {
+        "displayName": "Calibration Label",
+        "purpose": "Uppercase tracked headers and id-strip labels."
+      },
+      "calibration-id-value": {
+        "displayName": "ID Value",
+        "purpose": "The five figures of the identification strip."
+      },
+      "queue-title": {
+        "displayName": "Queue Title",
+        "purpose": "\"N changes selected\" in every variant; inherits the variant face."
+      },
+      "reading-detail": {
+        "displayName": "Detail Reading",
+        "purpose": "current → target on the detail page reading panels."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "SHAs, manifest paths, key paths and the values diff only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "tooltip",
+        "value": "0 6px 20px rgb(15 23 42 / 0.18)",
+        "purpose": "Dark hint bubble carrying a reading's breakdown; the only elevated object."
+      },
+      {
+        "name": "focus-ring-fitting-room",
+        "value": "0 0 0 4px var(--accent)",
+        "purpose": "Second focus ring under a 2px ink outline in fitting-room."
+      },
+      {
+        "name": "sticky-column-edge",
+        "value": "1px 0 0 var(--line)",
+        "purpose": "Hairline edge on the sticky VPA column under 860px; a line, not elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": "120ms ease-out",
+        "purpose": "Button background and border changes."
+      },
+      {
+        "name": "gauge-draw",
+        "value": "420ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Fitting-room eligible move bar scales in from the current tick; only under prefers-reduced-motion: no-preference."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All transitions and animations collapse under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "queue-stacks",
+        "value": "1240px"
+      },
+      {
+        "name": "compact",
+        "value": "860px"
+      },
+      {
+        "name": "narrow",
+        "value": "600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "The everyday control: filter shortcuts, Sign out, stepper links. Surface fill on a hairline border, variant radius.",
+      "html": "<button class=\"ds-btn\">CPU + memory</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px; padding:0 12px; border:1px solid var(--line, #e2e8f0); border-radius:var(--radius, 6px); background:var(--surface, #ffffff); color:var(--ink, #0f172a); font-family:var(--font, system-ui, sans-serif); font-size:13px; font-weight:550; cursor:pointer; transition:background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn:hover { background:var(--surface-2, #f1f5f9); } .ds-btn:focus-visible { outline:2px solid var(--accent-text, #1d4ed8); outline-offset:2px; } .ds-btn:disabled { opacity:.45; cursor:not-allowed; }"
+    },
+    {
+      "name": "Primary Button (Apply)",
+      "kind": "button",
+      "refersTo": "button-primary-default",
+      "description": "The queue's block Apply button; the one place the accent fills a control. Shown in all three variants.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-btn-primary\">Apply 9 changes</button><button class=\"ds-btn-primary ds-fr\">Apply 9 changes</button><button class=\"ds-btn-primary ds-cal\">Apply 9 changes</button></div>",
+      "css": ".ds-row { display:grid; gap:10px; width:280px; } .ds-btn-primary { width:100%; height:42px; border:1px solid #2563eb; border-radius:6px; background:#2563eb; color:#ffffff; font-family:system-ui, sans-serif; font-size:14.5px; font-weight:650; cursor:pointer; transition:background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-primary:hover { background:#1d4ed8; border-color:#1d4ed8; } .ds-btn-primary:focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; } .ds-btn-primary.ds-fr { background:#f2c230; border-color:#1d1f23; color:#1d1f23; border-radius:0; font-family:'Archivo Variable','Arial Narrow',sans-serif; } .ds-btn-primary.ds-fr:hover { background:#e3b11c; border-color:#1d1f23; } .ds-btn-primary.ds-fr:focus-visible { outline-color:#1d1f23; box-shadow:0 0 0 4px #f2c230; } .ds-btn-primary.ds-cal { background:#2348a8; border-color:#2348a8; border-radius:3px; font-family:'Public Sans Variable',sans-serif; } .ds-btn-primary.ds-cal:hover { background:#1b3a8c; border-color:#1b3a8c; } .ds-btn-primary.ds-cal:focus-visible { outline-color:#2348a8; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The filter bar's search field; 32px, hairline border, variant radius, accent focus outline.",
+      "html": "<input class=\"ds-input\" type=\"search\" placeholder=\"Filter namespace, VPA, workload…\">",
+      "css": ".ds-input { width:260px; height:32px; padding:0 10px; border:1px solid var(--line-strong, #cbd5e1); border-radius:var(--radius, 6px); background:var(--surface, #ffffff); color:var(--ink, #0f172a); font-family:var(--font, system-ui, sans-serif); font-size:13px; } .ds-input::placeholder { color:var(--ink-3, #5b6474); } .ds-input:focus-visible { outline:2px solid var(--accent-text, #1d4ed8); outline-offset:2px; } .ds-input[aria-invalid='true'] { border-color:var(--bad, #b91c1c); background:var(--bad-soft, #fee2e2); }"
+    },
+    {
+      "name": "Segmented Eligibility Filter",
+      "kind": "chip",
+      "refersTo": "button",
+      "description": "All / Eligible / Not eligible with live counts; pressed segment takes the accent tint (solid tape yellow in fitting-room).",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button aria-pressed=\"true\">All <span>14</span></button><button aria-pressed=\"false\">Eligible <span>7</span></button><button aria-pressed=\"false\">Not eligible <span>7</span></button></div>",
+      "css": ".ds-seg { display:inline-flex; border:1px solid var(--line, #e2e8f0); border-radius:var(--radius, 6px); overflow:hidden; background:var(--surface, #ffffff); font-family:var(--font, system-ui, sans-serif); } .ds-seg button { height:30px; padding:0 12px; border:0; border-right:1px solid var(--line, #e2e8f0); background:none; color:var(--ink, #0f172a); font:inherit; font-size:13px; font-weight:550; cursor:pointer; } .ds-seg button:last-child { border-right:0; } .ds-seg button:hover { background:var(--surface-2, #f1f5f9); } .ds-seg button:focus-visible { outline:2px solid var(--accent-text, #1d4ed8); outline-offset:-2px; } .ds-seg button span { color:var(--ink-3, #5b6474); font-weight:450; } .ds-seg button[aria-pressed='true'] { background:var(--accent-soft, #eff6ff); color:var(--accent-text, #1d4ed8); } .ds-seg button[aria-pressed='true'] span { color:inherit; }"
+    },
+    {
+      "name": "Navbar (fitting-room / calibration)",
+      "kind": "nav",
+      "refersTo": "nav-link-default-active",
+      "description": "The 48px dark shell bar of the navbar variants; active section underlined 3px (tape yellow shown; calibration uses #8fa8e8 on ink #1c2430). Default instead uses a 208px left sidebar with an accent-soft active pill.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\">argocd-vpa-sync</a><a class=\"ds-link is-active\" href=\"#\">Recommendations</a><a class=\"ds-link\" href=\"#\">Write-back history</a><a class=\"ds-link\" href=\"#\">Bindings</a><a class=\"ds-link\" href=\"#\">Settings</a></nav>",
+      "css": ".ds-nav { display:flex; align-items:stretch; gap:4px; height:48px; padding:0 32px; background:#23262b; font-family:'Archivo Variable','Arial Narrow',sans-serif; } .ds-brand { align-self:center; margin-right:28px; color:#f6f7f5; font-weight:700; font-size:15px; letter-spacing:-0.01em; text-decoration:none; } .ds-link { display:flex; align-items:center; padding:0 12px; color:#b4b9c0; font-size:13.5px; font-weight:550; text-decoration:none; border-top:3px solid transparent; border-bottom:3px solid transparent; } .ds-link:hover { color:#f6f7f5; } .ds-link:focus-visible { outline:2px solid #1d1f23; box-shadow:0 0 0 4px #f2c230; } .ds-link.is-active { color:#ffffff; border-bottom-color:#f2c230; }"
+    },
+    {
+      "name": "Shape + Fill Marks",
+      "kind": "custom",
+      "refersTo": "table-cell",
+      "description": "Eligibility and write-back state readable without colour: solid / hatched / triangle squares, and one mark per status (circles in default and calibration, squares in fitting-room).",
+      "html": "<div class=\"ds-marks\"><span><i class=\"ds-m ds-solid\"></i>Eligible</span><span><i class=\"ds-m ds-hatched\"></i>Not eligible</span><span><i class=\"ds-m ds-tri\"></i>Failed</span><span><i class=\"ds-m ds-new\"></i>New</span><span><i class=\"ds-m ds-applying\"></i>Applying</span><span><i class=\"ds-m ds-applied\"></i>Applied</span><span><i class=\"ds-m ds-skipped\"></i>Skipped</span></div>",
+      "css": ".ds-marks { display:flex; flex-wrap:wrap; gap:8px 18px; font-family:system-ui, sans-serif; font-size:13px; font-weight:600; color:#0f172a; } .ds-marks span { display:inline-flex; align-items:center; gap:7px; } .ds-m { display:inline-block; width:10px; height:10px; } .ds-solid { background:#15803d; } .ds-hatched { border:1px solid #5b6474; background:repeating-linear-gradient(135deg,#5b6474 0 1px,transparent 1px 3px); } .ds-tri { background:#b91c1c; clip-path:polygon(50% 0,100% 100%,0 100%); width:11px; } .ds-new { border:1.5px solid #5b6474; border-radius:50%; width:9px; height:9px; } .ds-applying { border:1.5px solid #1d4ed8; background:linear-gradient(90deg,#1d4ed8 50%,transparent 50%); border-radius:50%; width:9px; height:9px; } .ds-applied { background:#15803d; border-radius:50%; width:9px; height:9px; } .ds-skipped { border:1.5px solid #5b6474; background:linear-gradient(135deg,transparent 45%,#5b6474 45% 55%,transparent 55%); border-radius:50%; width:9px; height:9px; }"
+    },
+    {
+      "name": "Delta Badge (default)",
+      "kind": "chip",
+      "refersTo": "badge-increase",
+      "description": "Default's resource reading: target and percent change, amber up, green down, grey when not eligible; full breakdown in the tooltip.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-up\">27m (+22.7%)</span><span class=\"ds-badge ds-down\">150Mi (−49%)</span><span class=\"ds-badge\">397Mi (+35.5%)</span></div>",
+      "css": ".ds-badges { display:flex; gap:8px; font-family:system-ui, sans-serif; font-variant-numeric:tabular-nums; } .ds-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:550; background:#f1f5f9; color:#334155; } .ds-up { background:#ffedd5; color:#a14b06; } .ds-down { background:#dcfce7; color:#15803d; }"
+    },
+    {
+      "name": "Tape-Measure Gauge (fitting-room)",
+      "kind": "custom",
+      "refersTo": "table-cell",
+      "description": "Ruled scale, grey VPA band, black current tick, chalk-blue move with arrowhead; hatched when not eligible. Values below.",
+      "html": "<div class=\"ds-tape\"><span class=\"ds-g\"><span class=\"ds-scale\"></span><span class=\"ds-band\" style=\"left:20%;width:45%\"></span><span class=\"ds-move\" style=\"left:22%;width:30%\"></span><span class=\"ds-cur\" style=\"left:22%\"></span></span><span class=\"ds-g ds-ne\"><span class=\"ds-scale\"></span><span class=\"ds-band\" style=\"left:35%;width:40%\"></span><span class=\"ds-move\" style=\"left:40%;width:25%\"></span><span class=\"ds-cur\" style=\"left:40%\"></span></span><span class=\"ds-vals\">22m → <b>27m</b> <em>+22.7%</em></span></div>",
+      "css": ".ds-tape { display:grid; gap:6px; width:200px; font-family:'Archivo Variable','Arial Narrow',sans-serif; font-variant-numeric:tabular-nums; color:#1d1f23; } .ds-g { position:relative; display:block; height:20px; } .ds-g > span { position:absolute; display:block; } .ds-scale { left:0; right:0; bottom:0; height:8px; background:linear-gradient(#61666e,#61666e) left bottom/100% 1px no-repeat, repeating-linear-gradient(90deg,#61666e 0 1px,transparent 1px 5%) left bottom/100% 4px no-repeat, repeating-linear-gradient(90deg,#3f444b 0 1px,transparent 1px 25%) left bottom/100% 8px no-repeat; } .ds-band { top:2px; height:9px; background:#dcdfd9; } .ds-move { top:5px; height:4px; background:#3b6fb6; } .ds-move::after { content:''; position:absolute; top:-3px; right:-6px; width:7px; height:10px; background:#3b6fb6; clip-path:polygon(0 0,100% 50%,0 100%); } .ds-ne .ds-move { top:4px; height:6px; opacity:.8; background:repeating-linear-gradient(135deg,#3b6fb6 0 1.5px,transparent 1.5px 3.5px); } .ds-cur { top:0; width:2px; height:16px; margin-left:-1px; background:#1d1f23; } .ds-vals { font-size:13px; color:#3f444b; } .ds-vals b { color:#1d1f23; font-weight:650; } .ds-vals em { font-style:normal; font-size:12px; font-weight:650; color:#3b6fb6; margin-left:8px; }"
+    },
+    {
+      "name": "Tolerance Bar + Verdict (calibration)",
+      "kind": "custom",
+      "refersTo": "verdict-out",
+      "description": "VPA range between end caps, ink nominal tick at the recommendation, live request as a green ring (IN) or solid vermilion dot (OUT), followed by the verdict chip. Values above.",
+      "html": "<div class=\"ds-tol\"><span class=\"ds-vals\">22m → <b>27m</b> <em>+22.7%</em></span><span class=\"ds-row2\"><span class=\"ds-bar ds-out\"><span class=\"ds-rule\"></span><span class=\"ds-rng\" style=\"left:45%;width:30%\"></span><span class=\"ds-nom\" style=\"left:60%\"></span><span class=\"ds-pt\" style=\"left:15%\"></span></span><span class=\"ds-v ds-v-out\">OUT</span></span><span class=\"ds-row2\"><span class=\"ds-bar\"><span class=\"ds-rule\"></span><span class=\"ds-rng\" style=\"left:30%;width:40%\"></span><span class=\"ds-nom\" style=\"left:52%\"></span><span class=\"ds-pt\" style=\"left:48%\"></span></span><span class=\"ds-v ds-v-in\">IN</span></span></div>",
+      "css": ".ds-tol { display:grid; gap:6px; width:200px; font-family:'Public Sans Variable',sans-serif; font-variant-numeric:tabular-nums; color:#1c2430; } .ds-vals { font-size:13px; color:#3c4857; } .ds-vals b { color:#1c2430; font-weight:650; } .ds-vals em { font-style:normal; font-size:12px; font-weight:650; color:#1c2430; margin-left:8px; } .ds-row2 { display:flex; align-items:center; gap:8px; } .ds-bar { position:relative; flex:1; height:14px; } .ds-bar > span { position:absolute; display:block; } .ds-rule { left:0; right:0; top:6px; height:2px; background:#dde3ea; } .ds-rng { top:3px; height:8px; background:#d3dbe4; border-left:2px solid #5b6b7c; border-right:2px solid #5b6b7c; } .ds-nom { top:0; width:2px; height:14px; margin-left:-1px; background:#1c2430; } .ds-pt { top:2px; width:10px; height:10px; margin-left:-5px; border-radius:50%; border:2px solid #1f7a4d; background:#ffffff; box-sizing:border-box; } .ds-out .ds-pt { border-color:#b8391f; background:#b8391f; } .ds-v { padding:1px 5px; border:1px solid; border-radius:2px; font-size:11px; font-weight:650; letter-spacing:.06em; line-height:14px; } .ds-v-in { color:#1f7a4d; border-color:color-mix(in srgb,#1f7a4d 40%,transparent); background:#e3f2ea; } .ds-v-out { color:#ffffff; border-color:#b8391f; background:#b8391f; }"
+    },
+    {
+      "name": "Write-back Queue",
+      "kind": "card",
+      "refersTo": "queue-panel",
+      "description": "The single apply path on the list: count, totals, selected containers, settings, Apply and the Git caption. Shown as fitting-room's alteration ticket with a calibration-style diff line.",
+      "html": "<aside class=\"ds-queue\"><div class=\"ds-qhead\"><h2><span>9</span> changes selected</h2><p>7 containers · commits to main</p></div><dl class=\"ds-tot\"><div><dt>CPU requests</dt><dd>446m → 382m</dd></div><div><dt>Memory requests</dt><dd>1.9Gi → 2.2Gi</dd></div></dl><div class=\"ds-diff\"><div class=\"ds-file\">apps/atlas-stg/atlas-checkout/values.yaml</div><div class=\"ds-line\"><span class=\"k\">resources.requests.cpu</span><s>22m</s><span>→</span><b>27m</b></div></div><button class=\"ds-apply\">Apply 9 changes</button><p class=\"ds-cap\">Write-back commits to Git; Argo CD syncs from there.</p></aside>",
+      "css": ".ds-queue { width:300px; border:1px solid #23262b; background:#ffffff; font-family:'Archivo Variable','Arial Narrow',sans-serif; font-variant-numeric:tabular-nums; color:#1d1f23; } .ds-queue > * { margin:0; padding-left:18px; padding-right:18px; } .ds-qhead { padding-top:16px; padding-bottom:16px; background:#23262b; color:#f6f7f5; } .ds-qhead h2 { margin:0; font-size:18px; font-weight:700; letter-spacing:-0.01em; } .ds-qhead h2 span { color:#f2c230; font-size:26px; font-weight:800; line-height:1; } .ds-qhead p { margin:4px 0 0; font-size:13px; color:#b4b9c0; } .ds-tot { display:grid; gap:8px; margin-top:14px; padding-top:14px; border-top:2px dashed #61666e; } .ds-tot div { display:flex; justify-content:space-between; font-size:13px; } .ds-tot dt { color:#61666e; } .ds-tot dd { margin:0; font-weight:650; } .ds-diff { margin:14px 18px 0; padding:0; border:1px solid #d9dcd6; font-family:'JetBrains Mono Variable',ui-monospace,monospace; font-size:11.5px; } .ds-file { padding:5px 8px; background:#eceee9; border-bottom:1px solid #d9dcd6; color:#3f444b; overflow-wrap:anywhere; } .ds-line { display:flex; gap:6px; padding:3px 8px; } .ds-line .k { flex:1; color:#61666e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-line s { color:#c8372d; } .ds-line b { color:#2e7d4f; } .ds-apply { display:block; width:calc(100% - 36px); margin:14px 18px 0; height:42px; border:1px solid #1d1f23; background:#f2c230; color:#1d1f23; font:inherit; font-size:14.5px; font-weight:650; cursor:pointer; } .ds-apply:hover { background:#e3b11c; } .ds-apply:focus-visible { outline:2px solid #1d1f23; box-shadow:0 0 0 4px #f2c230; } .ds-cap { padding-top:8px; padding-bottom:18px; text-align:center; font-size:12px; color:#61666e; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "One Desk, Three Instruments",
+    "overview": "The dashboard is a review desk for a weekly batch of VPA recommendations, read on a large monitor in office daylight. Every page, component and behavior is shared; what changes per install is the instrument the reviewer reads a recommendation with. The Helm value `theme` (env `DASHBOARD_THEME`) picks one of three named variants: **Default** (`default`), the familiar admin console with a left sidebar and delta badges; **The Fitting Room** (`fitting-room`), a charcoal navbar, tape-yellow commitment and a tape-measure gauge per resource; **Calibration Certificate** (`calibration`), an ink header band with an identification strip, a tolerance bar and an IN/OUT verdict per resource, and a values diff in the queue. All three are light grounds.\n\nThe shared system is dense and tabular: one fixed-layout table of workloads, a sticky guide line naming the namespace range on screen, and a sticky write-back queue on the right that is the only way to apply from the list. Meaning never rides on colour alone: eligibility is carried by fill (solid vs hatched), direction by shape (arrowhead, tick position), write-back status by a distinct mark per state. Themes swap tokens and a small set of scoped rules under `:root[data-theme]`; they never fork a page.\n\nDepth is flat. Surfaces sit on hairlines, not shadows; the one lifted object is the hover tooltip that carries each reading's full breakdown.",
+    "keyCharacteristics": [
+      "Three install-time variants over identical routes, components and behavior; tokens redefined per `[data-theme]`.",
+      "Dense, tabular figures everywhere (`font-variant-numeric: tabular-nums` on body).",
+      "Shape + fill marks for eligibility and status, readable without colour.",
+      "One apply path on the list: the sticky write-back queue panel.",
+      "A guide line above the table naming the first and last namespace in view.",
+      "Flat surfaces on 1px hairlines; the tooltip is the only shadowed element."
+    ],
+    "rules": [
+      {
+        "name": "The One Commitment Rule",
+        "body": "Each variant has exactly one accent, and it marks what the reviewer has committed to: the primary button, selected rows, the active section. State colours are never borrowed as accents.",
+        "section": "colors"
+      },
+      {
+        "name": "The Muted-When-Ineligible Rule",
+        "body": "A reading is coloured by direction only when it can be selected. A green decrease on a resource that is not eligible reads as an invitation; ineligible readings are muted (grey badge, hatched move, regular-weight delta).",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number on screen uses tabular figures so values align down a column; the body sets it once.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono-For-Git Rule",
+        "body": "Monospace is for what lands in Git (SHAs, file paths, key paths, diffs), never for labels or figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Containers are drawn with 1px lines, headings with 2px rules. No surface floats.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** put every new colour, radius, label style and gutter behind a `--token` and redefine it under each `:root[data-theme]`; components read tokens, themes never fork a page.",
+      "**Do** carry meaning by shape and fill first: solid vs hatched for eligibility, arrowhead or tick position for direction, a distinct mark per write-back status.",
+      "**Do** route every write into the write-back queue (the list's queue panel, or the detail page's \"Queue selected for write-back\"), and keep the copy saying the change goes to Git.",
+      "**Do** keep numbers tabular and right-aligned where they compare (totals, serials).",
+      "**Do** keep the reading's full breakdown in the hover tooltip in every variant, not in the cell.",
+      "**Do** keep fitting-room square (0px) and its accent text ink on yellow.",
+      "**Do** honour `prefers-reduced-motion`; the gauge draw-in is the only animation."
+    ],
+    "donts": [
+      "**Don't** add per-row Accept buttons to the table; on the list, the queue panel is the single apply path.",
+      "**Don't** colour a reading by direction when it isn't eligible.",
+      "**Don't** reintroduce a table/cards toggle; the list is a table.",
+      "**Don't** lift surfaces with shadows; the tooltip is the only shadowed object.",
+      "**Don't** use monospace for anything that does not land in Git.",
+      "**Don't** give a variant a dark ground; all three are read in office daylight."
+    ]
+  }
+}

@@ -1,8 +1,9 @@
-import { formatCPU, formatMemory } from '../lib/format'
+import { formatCPU, formatMemory, formatPercent, roundPercent } from '../lib/format'
 import { formatReasons } from '../lib/reasons'
 import { Hint } from './Hint'
+import { Icon } from './Icon'
 
-interface DeltaBadgeProps {
+export interface DeltaBadgeProps {
   current?: string
   /** What the delta is computed against: the VPA recommendation plus any recorded request headroom. */
   recommended?: string
@@ -22,30 +23,14 @@ interface DeltaBadgeProps {
 }
 
 /**
- * The value a resource would move to, and by how much, with the full
- * breakdown (current value, VPA recommendation, headroom, and how the target
- * follows from them) in a hover tooltip rather than crammed into the badge.
+ * The full breakdown behind a resource's change -- current value, VPA
+ * recommendation, headroom, and how the target follows from them -- shown
+ * in a hover tooltip by every theme rather than crammed into the cell.
  */
-export function DeltaBadge({ current, recommended, percent, kind, headroomPercent, vpa, eligible = true, reasons }: DeltaBadgeProps) {
+export function DeltaBreakdown({ current, recommended, percent, kind, headroomPercent, vpa, eligible = true, reasons }: DeltaBadgeProps) {
   const format = kind === 'memory' ? formatMemory : formatCPU
-
-  if (!current || !recommended) {
-    return <span className="badge badge-muted">n/a</span>
-  }
-
-  const rounded = percent === undefined ? undefined : Math.round(percent * 10) / 10
-  const alreadyMatches = rounded === 0
-  const badgeKind =
-    !eligible || rounded === undefined
-      ? 'badge-muted'
-      : rounded > 0
-        ? 'badge-increase'
-        : rounded < 0
-          ? 'badge-decrease'
-          : 'badge-muted'
-  const change = rounded === undefined ? '' : ` (${rounded > 0 ? '+' : ''}${rounded}%)`
-
-  const breakdown = (
+  const rounded = roundPercent(percent)
+  return (
     <>
       Current request: <strong>{format(current)}</strong>
       <br />
@@ -62,10 +47,10 @@ export function DeltaBadge({ current, recommended, percent, kind, headroomPercen
       {rounded !== undefined && (
         <>
           <br />
-          Change from current: <strong>{`${rounded > 0 ? '+' : ''}${rounded}%`}</strong>
+          Change from current: <strong>{formatPercent(rounded)}</strong>
         </>
       )}
-      {!eligible && !alreadyMatches && (
+      {!eligible && rounded !== 0 && (
         <>
           <br />
           <br />
@@ -74,15 +59,40 @@ export function DeltaBadge({ current, recommended, percent, kind, headroomPercen
       )}
     </>
   )
+}
+
+/**
+ * The value a resource would move to, and by how much, with the breakdown
+ * in a hover tooltip -- the default theme's reading of a resource.
+ */
+export function DeltaBadge(props: DeltaBadgeProps) {
+  const { current, recommended, percent, kind, eligible = true } = props
+  const format = kind === 'memory' ? formatMemory : formatCPU
+
+  if (!current || !recommended) {
+    return <span className="badge badge-muted">n/a</span>
+  }
+
+  const rounded = roundPercent(percent)
+  const alreadyMatches = rounded === 0
+  const badgeKind =
+    !eligible || rounded === undefined
+      ? 'badge-muted'
+      : rounded > 0
+        ? 'badge-increase'
+        : rounded < 0
+          ? 'badge-decrease'
+          : 'badge-muted'
+  const change = rounded === undefined ? '' : ` (${formatPercent(rounded)})`
 
   return (
     <>
       <Hint className="delta-hint" trigger={<span className={`badge ${badgeKind}`}>{format(recommended)}{change}</span>}>
-        {breakdown}
+        <DeltaBreakdown {...props} />
       </Hint>
       {alreadyMatches && (
         <span className="badge badge-ok" aria-label="Already matches the target">
-          ✓
+          <Icon name="check" />
         </span>
       )}
     </>

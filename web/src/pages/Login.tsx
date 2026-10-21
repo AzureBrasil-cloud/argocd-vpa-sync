@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { login } from '../api/client'
+import { getUserInfo, login } from '../api/client'
+import { Icon, Logo } from '../components/Icon'
+import { applyTheme, resolveTheme } from '../theme'
 
 /**
  * Where to go after logging in: the ?next= path, but only a same-origin
@@ -21,6 +23,13 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // The theme comes from the same unauthenticated endpoint the shell uses.
+  useEffect(() => {
+    getUserInfo()
+      .then((info) => applyTheme(resolveTheme(info.theme)))
+      .catch(() => applyTheme(resolveTheme(undefined)))
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -43,23 +52,18 @@ export function Login() {
   }
 
   return (
-    <div className="login">
-      <form className="panel login-form" onSubmit={handleSubmit}>
-        <div className="app-header-title">
-          <span className="app-logo" aria-hidden="true">◔</span>
-          <h1>argocd-vpa-updater</h1>
+    <main className="login">
+      <form className="login-form" onSubmit={handleSubmit}>
+        <div className="login-brand">
+          <Logo />
+          <h1>argocd-vpa-sync</h1>
         </div>
-        <label className="login-field">
+        <p className="login-sub">Sign in to review VPA recommendations and queue write-backs to Git.</p>
+        <label className="field">
           <span>Username</span>
-          <input
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
+          <input name="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
         </label>
-        <label className="login-field">
+        <label className="field">
           <span>Password</span>
           <input
             name="password"
@@ -71,11 +75,16 @@ export function Login() {
             required
           />
         </label>
-        {error && <div className="panel panel-error">{error}</div>}
-        <button className="btn btn-primary" type="submit" disabled={submitting}>
+        {error && (
+          <div className="callout callout-error" role="alert">
+            <Icon name="error" />
+            <span>{error}</span>
+          </div>
+        )}
+        <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-    </div>
+    </main>
   )
 }

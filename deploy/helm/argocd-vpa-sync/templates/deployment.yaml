@@ -64,6 +64,8 @@ spec:
               value: {{ .Values.argocd.namespace | quote }}
             - name: WRITEBACK_POLL_INTERVAL_SECONDS
               value: {{ .Values.writeback.pollIntervalSeconds | quote }}
+            - name: DASHBOARD_THEME
+              value: {{ .Values.theme | quote }}
             - name: SSH_KNOWN_HOSTS
               value: /app/config/ssh/ssh_known_hosts
             {{- if include "argocd-vpa-sync.authEnabled" . }}
