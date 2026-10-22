@@ -17,6 +17,8 @@
   --surface-2: #f1f5f9;
   --ink: #0f172a;
   --ink-2: #334155;
+  /* Select chevron (Lucide chevron-down) in --ink-2; a data URI can't read tokens. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --ink-3: #5b6474;
   --line: #e2e8f0;
   --line-strong: #cbd5e1;
@@ -66,6 +68,8 @@
   --surface-2: #eceee9;
   --ink: #1d1f23;
   --ink-2: #3f444b;
+  /* Select chevron (Lucide chevron-down) in --ink-2; a data URI can't read tokens. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233f444b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --ink-3: #61666e;
   --line: #d9dcd6;
   --line-strong: #23262b;
@@ -113,6 +117,8 @@
   --surface-2: #f3f5f8;
   --ink: #1c2430;
   --ink-2: #3c4857;
+  /* Select chevron (Lucide chevron-down) in --ink-2; a data URI can't read tokens. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233c4857' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --ink-3: #5b6b7c;
   --line: #dde3ea;
   --line-strong: #1c2430;
@@ -386,9 +392,9 @@ textarea {
   overflow: visible;
 }
 
-/* Each sidebar icon acts out its section once, on hover, keyboard focus and
-   on arrival (the rule starts matching when the link turns active). Parts
-   pivot in the icon's own 24-unit viewBox. */
+/* Each section icon acts out its section once: in the sidebar on hover,
+   keyboard focus and arrival (the rule starts matching when the link turns
+   active), and in the page title when the page opens. Parts pivot in the icon's own 24-unit viewBox. */
 :root[data-theme='default'] .nav-icon * {
   transform-box: view-box;
 }
@@ -399,8 +405,8 @@ textarea {
     transform-origin: 12px 14px;
   }
 
-  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-gauge path:first-child {
-    animation: nav-gauge-read 560ms cubic-bezier(0.16, 1, 0.3, 1);
+  :root[data-theme='default'] :is(.nav-link:is(:hover, :focus-visible, .active), .page-title) .nav-icon-gauge path:first-child {
+    animation: nav-gauge-read 560ms cubic-bezier(0.16, 1, 0.3, 1) var(--motion-delay, 0ms);
   }
 
   /* History: the clock hands rewind a full turn. */
@@ -408,22 +414,22 @@ textarea {
     transform-origin: 12px 12px;
   }
 
-  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-history path:nth-child(3) {
-    animation: nav-history-rewind 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  :root[data-theme='default'] :is(.nav-link:is(:hover, :focus-visible, .active), .page-title) .nav-icon-history path:nth-child(3) {
+    animation: nav-history-rewind 520ms cubic-bezier(0.16, 1, 0.3, 1) var(--motion-delay, 0ms);
   }
 
   /* Bindings: the two halves part, then close onto the bar. */
-  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-link path:first-child {
-    animation: nav-link-left 440ms cubic-bezier(0.16, 1, 0.3, 1);
+  :root[data-theme='default'] :is(.nav-link:is(:hover, :focus-visible, .active), .page-title) .nav-icon-link path:first-child {
+    animation: nav-link-left 440ms cubic-bezier(0.16, 1, 0.3, 1) var(--motion-delay, 0ms);
   }
 
-  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-link path:nth-child(2) {
-    animation: nav-link-right 440ms cubic-bezier(0.16, 1, 0.3, 1);
+  :root[data-theme='default'] :is(.nav-link:is(:hover, :focus-visible, .active), .page-title) .nav-icon-link path:nth-child(2) {
+    animation: nav-link-right 440ms cubic-bezier(0.16, 1, 0.3, 1) var(--motion-delay, 0ms);
   }
 
   /* Settings: the cog turns one tooth (6-fold, so it lands where it began). */
-  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-cog {
-    animation: nav-cog-turn 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  :root[data-theme='default'] :is(.nav-link:is(:hover, :focus-visible, .active), .page-title) .nav-icon-cog {
+    animation: nav-cog-turn 480ms cubic-bezier(0.16, 1, 0.3, 1) var(--motion-delay, 0ms);
   }
 }
 
@@ -570,6 +576,32 @@ textarea {
 
 :root[data-theme='fitting-room'] .page-title {
   font-stretch: 92%;
+}
+
+/* Default: the section's sidebar icon leads the title, bare and in the
+   accent, and acts out its section once when the page opens. */
+:root[data-theme='default'] .page-title:has(.page-title-icon) {
+  --motion-delay: 120ms;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title-icon {
+  flex: none;
+  color: var(--accent-text);
+}
+
+/* Default: the header is its own band above the work, closed by a
+   hairline, so the title, the filters and the queue each read as a row. */
+:root[data-theme='default'] .page-head {
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+:root[data-theme='default'] .page-head .page-sub {
+  margin-top: 8px;
 }
 
 .page-sub {
@@ -801,6 +833,23 @@ select {
   border-color: var(--line);
 }
 
+/* Selects draw their own chevron, inset from the edge like the field's
+   text, instead of the platform arrow pressed against the border. */
+select {
+  appearance: none;
+  padding-right: 34px;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 input::placeholder {
   color: var(--ink-3);
 }
@@ -864,6 +913,39 @@ input[type='checkbox']:disabled {
   color: var(--accent-text);
 }
 
+/* Default: a single highlight slides to the pressed option (Segmented
+   publishes its offset and width), instead of each button filling. */
+:root[data-theme='default'] .segmented {
+  position: relative;
+  isolation: isolate;
+}
+
+:root[data-theme='default'] .segmented::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: -1;
+  width: var(--seg-w, 0);
+  transform: translateX(var(--seg-x, 0));
+  background: var(--accent-soft);
+}
+
+:root[data-theme='default'] .segmented[data-ready]::before {
+  transition:
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme='default'] .segmented button {
+  transition: color 160ms ease-out;
+}
+
+:root[data-theme='default'] .segmented button[aria-pressed='true'],
+:root[data-theme='default'] .segmented button[aria-pressed='true']:hover {
+  background: none;
+}
+
 :root[data-theme='fitting-room'] .segmented button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-ink);
@@ -922,6 +1004,26 @@ input[type='checkbox']:disabled {
 
 .search input {
   width: 260px;
+}
+
+:root[data-theme='default'] .search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 380px;
+}
+
+:root[data-theme='default'] .search input {
+  width: 100%;
+  padding-left: 32px;
+}
+
+.search-icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  pointer-events: none;
 }
 
 .select-eligible {
@@ -1792,6 +1894,90 @@ td.col-vpa .vpa-meta {
 
 .queue > * {
   flex: none;
+}
+
+/* Queue motion: the panel acknowledges what just changed in the selection.
+   A part that appears (the filled or empty state, a totals row, a warning)
+   settles in; a container added to the queue drops into the list and keeps
+   an accent tint that fades, so the reviewer sees what the click added; the
+   count rolls in the direction it moved; a changed total flashes. Removals
+   are instant. */
+@media (prefers-reduced-motion: no-preference) {
+  .queue > :not(.queue-list-wrap),
+  .queue-totals > div,
+  .queue-resource {
+    animation: queue-part-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .queue-item {
+    animation:
+      queue-item-in 260ms cubic-bezier(0.16, 1, 0.3, 1),
+      queue-item-tint 1400ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .queue-count {
+    display: inline-block;
+    animation: queue-count-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .queue-count[data-direction='down'] {
+    animation-name: queue-count-down;
+  }
+
+  .queue-value {
+    animation: queue-value-flash 600ms ease-out;
+  }
+}
+
+/* Reduced motion keeps the tint (it says what was added) without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .queue-item {
+    animation: queue-item-tint 1400ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+}
+
+@keyframes queue-part-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes queue-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes queue-item-tint {
+  from,
+  30% {
+    background-color: var(--accent-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes queue-count-up {
+  from {
+    opacity: 0;
+    transform: translateY(45%);
+  }
+}
+
+@keyframes queue-count-down {
+  from {
+    opacity: 0;
+    transform: translateY(-45%);
+  }
+}
+
+@keyframes queue-value-flash {
+  from {
+    color: var(--accent-text);
+  }
 }
 
 /* The list of selected containers scrolls; the totals above and the

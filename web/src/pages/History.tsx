@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../components/Icon'
+import { PageTitle } from '../components/PageTitle'
+import { Segmented } from '../components/Segmented'
 import { StatusBadge } from '../components/StatusBadge'
 import { ageSince, formatWhen, useNow } from '../lib/time'
 import { shortRepo } from '../lib/format'
@@ -52,7 +54,7 @@ export function History() {
   return (
     <div className="page">
       <header className="page-head">
-        <h1 className="page-title">Write-back history</h1>
+        <PageTitle section="history" />
         <p className="page-sub">
           The latest write-back for each container, newest first. Git keeps the full history of every commit.
         </p>
@@ -69,20 +71,17 @@ export function History() {
       {items && (
         <>
           <div className="filters">
-            <div className="segmented" role="group" aria-label="Write-back status">
-              {(
-                [
-                  ['all', 'All'],
-                  ['applied', 'Applied'],
-                  ['failed', 'Failed'],
-                  ['in-flight', 'In flight'],
-                ] as const
-              ).map(([value, label]) => (
-                <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
-                  {label} <span className="count">{counts[value]}</span>
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Write-back status"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'all', label: 'All', count: counts.all },
+                { value: 'applied', label: 'Applied', count: counts.applied },
+                { value: 'failed', label: 'Failed', count: counts.failed },
+                { value: 'in-flight', label: 'In flight', count: counts['in-flight'] },
+              ]}
+            />
           </div>
 
           {shown.length === 0 ? (

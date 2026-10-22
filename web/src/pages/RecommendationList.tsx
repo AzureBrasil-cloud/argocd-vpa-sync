@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Search } from "lucide-react";
 import { selectRecommendation } from "../api/client";
 import type { RecommendationDTO, RecommendationStatus, SelectRequest } from "../api/types";
 import { EligibilityBadge } from "../components/EligibilityBadge";
 import { Icon } from "../components/Icon";
+import { PageTitle } from "../components/PageTitle";
 import { ResourceCheckbox } from "../components/ResourceCheckbox";
 import { ResourceReading } from "../components/ResourceReading";
+import { Segmented } from "../components/Segmented";
 import { SelectionSummary, type SelectedRow } from "../components/SelectionSummary";
 import { StatusBadge } from "../components/StatusBadge";
 import { ageSince, useNow } from "../lib/time";
@@ -33,6 +36,10 @@ interface SortState {
 }
 
 type EligibilityFilter = "all" | "eligible" | "not-eligible";
+
+function plural(count: number, noun: string): string {
+  return count === 1 ? noun : `${noun}s`;
+}
 
 const STATUSES: RecommendationStatus[] = ["new", "selected", "applying", "applied", "skipped", "failed"];
 
@@ -275,6 +282,9 @@ export function RecommendationList() {
   if (error) {
     return (
       <div className="page">
+        <header className="page-head">
+          <PageTitle section="recommendations" />
+        </header>
         <div className="callout callout-error">
           <Icon name="error" />
           <span>Failed to load recommendations: {error}</span>
@@ -285,6 +295,9 @@ export function RecommendationList() {
   if (items === null) {
     return (
       <div className="page">
+        <header className="page-head">
+          <PageTitle section="recommendations" />
+        </header>
         <p className="loading">Loading recommendations…</p>
       </div>
     );
@@ -292,7 +305,9 @@ export function RecommendationList() {
   if (items.length === 0) {
     return (
       <div className="page">
-        <h1 className="page-title">Recommendations</h1>
+        <header className="page-head">
+          <PageTitle section="recommendations" />
+        </header>
         <div className="empty">
           <h2>No VPA recommendations yet</h2>
           <p>
@@ -323,6 +338,24 @@ export function RecommendationList() {
       const sel = selection[rowKey(i)];
       return sel && (!canCPU(i) || sel.cpu) && (!canMemory(i) || sel.memory);
     });
+
+  // Bulk actions on what is on screen. The default theme puts them on the
+  // guide line, which names exactly that set; the navbar themes keep them in
+  // the filter row, where the guide line carries the gauge legend.
+  const selectEligibleGroup = (
+    <div className="select-eligible" role="group" aria-label="Select eligible changes on screen">
+      <span className="select-eligible-label">Select eligible</span>
+      <button className="btn btn-small" disabled={!anyCPU && !anyMemory} onClick={() => selectEligible(true, true)}>
+        CPU + memory
+      </button>
+      <button className="btn btn-small" disabled={!anyMemory} onClick={() => selectEligible(false, true)}>
+        Memory
+      </button>
+      <button className="btn btn-small" disabled={!anyCPU} onClick={() => selectEligible(true, false)}>
+        CPU
+      </button>
+    </div>
+  );
 
   function toggleAllVisible(checked: boolean) {
     if (checked) selectEligible(true, true);
@@ -381,10 +414,10 @@ export function RecommendationList() {
         </section>
       ) : (
         <header className="page-head">
-          <h1 className="page-title">Recommendations</h1>
+          <PageTitle section="recommendations" />
           <p className="page-sub">
-            <strong>{items.length}</strong> containers in <strong>{vpaCount}</strong> VPAs · <strong>{eligibleCount}</strong>{" "}
-            eligible
+            <strong>{items.length}</strong> {plural(items.length, "container")} in <strong>{vpaCount}</strong>{" "}
+            {plural(vpaCount, "VPA")} · <strong>{eligibleCount}</strong> eligible
             {failedCount > 0 && (
               <>
                 {" "}
@@ -407,6 +440,7 @@ export function RecommendationList() {
           <div className="filters">
             <label className="search">
               <span className="sr-only">Filter by namespace, VPA, workload or container</span>
+              {theme === "default" && <Search className="search-icon" size={16} strokeWidth={1.5} aria-hidden="true" />}
               <input
                 type="search"
                 placeholder="Filter namespace, VPA, workload…"
@@ -414,19 +448,16 @@ export function RecommendationList() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
-            <div className="segmented" role="group" aria-label="Eligibility">
-              {(
-                [
-                  ["all", "All", searched.length],
-                  ["eligible", "Eligible", searched.filter((i) => i.eligible).length],
-                  ["not-eligible", "Not eligible", searched.filter((i) => !i.eligible).length],
-                ] as const
-              ).map(([value, label, count]) => (
-                <button key={value} aria-pressed={eligibility === value} onClick={() => setEligibility(value)}>
-                  {label} <span className="count">{count}</span>
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Eligibility"
+              value={eligibility}
+              onChange={setEligibility}
+              options={[
+                { value: "all", label: "All", count: searched.length },
+                { value: "eligible", label: "Eligible", count: searched.filter((i) => i.eligible).length },
+                { value: "not-eligible", label: "Not eligible", count: searched.filter((i) => !i.eligible).length },
+              ]}
+            />
             <label className="select">
               <span>Status</span>
               <select value={status} onChange={(e) => setStatus(e.target.value as RecommendationStatus | "any")}>
@@ -438,18 +469,7 @@ export function RecommendationList() {
                 ))}
               </select>
             </label>
-            <div className="select-eligible" role="group" aria-label="Select eligible changes on screen">
-              <span className="select-eligible-label">Select eligible</span>
-              <button className="btn btn-small" disabled={!anyCPU && !anyMemory} onClick={() => selectEligible(true, true)}>
-                CPU + memory
-              </button>
-              <button className="btn btn-small" disabled={!anyMemory} onClick={() => selectEligible(false, true)}>
-                Memory
-              </button>
-              <button className="btn btn-small" disabled={!anyCPU} onClick={() => selectEligible(true, false)}>
-                CPU
-              </button>
-            </div>
+            {theme !== "default" && selectEligibleGroup}
           </div>
 
           <div className="guide" aria-live="polite">
@@ -457,8 +477,9 @@ export function RecommendationList() {
               {range ? (range.first === range.last ? range.first : `${range.first} — ${range.last}`) : "No matches"}
             </span>
             <span className="guide-count">
-              {visibleItems.length} of {items.length} containers
+              {visibleItems.length} of {items.length} {plural(items.length, "container")}
             </span>
+            {theme === "default" && selectEligibleGroup}
             {theme !== "default" && (
               <span className="guide-legend" aria-hidden="true">
                 <span className="legend-item">

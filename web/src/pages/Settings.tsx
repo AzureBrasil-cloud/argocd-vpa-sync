@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getSettings } from '../api/client'
 import type { SettingsDTO } from '../api/types'
 import { Icon } from '../components/Icon'
+import { PageTitle } from '../components/PageTitle'
 import { RequestHeadroomInput } from '../components/RequestHeadroomInput'
 import { useRequestHeadroom } from '../lib/useRequestHeadroom'
 import { THEME_LABELS, THEMES, useTheme, type Theme } from '../theme'
@@ -38,7 +39,7 @@ export function Settings() {
   return (
     <div className="page page-narrow">
       <header className="page-head">
-        <h1 className="page-title">Settings</h1>
+        <PageTitle section="settings" />
         <p className="page-sub">
           Deployment settings come from the Helm values and are read-only here. Change them with <code>helm upgrade</code>.
         </p>

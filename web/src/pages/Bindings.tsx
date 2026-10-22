@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { RecommendationDTO } from '../api/types'
 import { Icon } from '../components/Icon'
+import { PageTitle } from '../components/PageTitle'
 import { recommendationPath, rowKey, useRecommendations } from '../lib/useRecommendations'
 
 interface BindingGroup {
@@ -38,7 +39,7 @@ export function Bindings() {
   return (
     <div className="page">
       <header className="page-head">
-        <h1 className="page-title">Bindings</h1>
+        <PageTitle section="bindings" />
         <p className="page-sub">
           Each <code>VpaGitOpsBinding</code> opts a VPA in to write-back and says where in Git its values live. Edit them as CRDs
           in Git; this page is read-only.

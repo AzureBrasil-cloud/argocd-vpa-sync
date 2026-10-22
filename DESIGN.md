@@ -295,7 +295,7 @@ All three faces are self-hosted via Fontsource and bundled into the binary.
 **Character:** a working sans at 14px with tabular figures throughout; the variants differ in how labels speak. Default labels are sentence case; fitting-room and calibration labels are small uppercase with open tracking, like the printing on a measuring tool or a certificate.
 
 ### Hierarchy
-- **Title** (650-700, 22-24px, 1.2, -0.015em): the page title. Calibration's list page replaces it with the identification strip.
+- **Title** (650-700, 22-24px, 1.2, -0.015em): the page title. Calibration's list page replaces it with the identification strip. In default, the title leads with its section's sidebar icon, bare (24px, 1.75 stroke, accent text), 10px before the text, and the icon plays its section's motion once when the page opens; the subtitle sits 8px below on the page's left edge, and a hairline 18px under it closes the header band before the work area. The title renders in loading, error and empty states too.
 - **Queue title** (700, 18px): "N changes selected"; fitting-room sets the count in tape yellow at 26px/800.
 - **ID value** (700, 20px, calibration only): the five figures in the identification strip, with 12.5px small-text units.
 - **Section heading** (700, 15-16px): binding names, detail sections, settings sections.
@@ -314,7 +314,7 @@ The page grid is the **work layout**: a fluid main column and a fixed queue colu
 
 **Shell placement by variant.** Default: a 208px sticky left sidebar (brand, vertical nav, session pinned to the bottom above a hairline). Fitting-room and calibration: a 48px sticky top navbar (`--bar-h`) with brand, horizontal nav and the session pushed right. Calibration's list page adds the identification strip, a full-bleed five-column band in the shell ink directly under the navbar (cluster, bindings, eligible, failed write-backs, last commit) that stands in for the page title.
 
-**Rhythm.** Controls are 32px tall (28px small, 38px form fields, 42px block primary). Table cells pad 10px 12px. Gaps step 4 / 8 / 12 / 16 / 24 / 32px. The filter bar wraps with 10px 12px gaps; "Select eligible" pushes right.
+**Rhythm.** Controls are 32px tall (28px small, 38px form fields, 42px block primary). Table cells pad 10px 12px. Gaps step 4 / 8 / 12 / 16 / 24 / 32px. The filter bar wraps with 10px 12px gaps. In default it holds search (fills up to 380px, Lucide search icon inset 10px), the eligibility filter and Status; "Select eligible" sits on the guide line, pushed right, since it acts on the set the guide line names. The navbar themes keep "Select eligible" pushed right in the filter bar, where their guide line carries the gauge legend.
 
 **The guide line.** Sticky under the shell (`top: var(--bar-h)`), it names the namespace range in view ("atlas-stg — monitor"), the visible count, and (navbar themes) a legend for the gauge marks. It sits on a 2px head rule in calibration, on a strip of tape ruling (1px ticks every 8px, longer every 80px) in fitting-room, and with no rule in default.
 
@@ -353,7 +353,7 @@ Gauges are drawn from absolutely positioned bars, ticks and clip-path arrowheads
 
 ### Segmented filter
 - **Style:** one bordered group (All / Eligible / Not eligible) with counts in `--ink-3`; 30px tall.
-- **Pressed:** accent-soft fill with accent text; in fitting-room, solid tape yellow with ink text and an ink border on the group.
+- **Pressed:** accent-soft fill with accent text; in fitting-room, solid tape yellow with ink text and an ink border on the group. In default, one accent-soft highlight slides to the pressed option (240ms, `cubic-bezier(0.16, 1, 0.3, 1)`) instead of each button filling. One shared component (`Segmented`) on Recommendations and Write-back history.
 
 ### Inputs / Fields
 - **Style:** 32px, 10px side padding, 1px border (`--line-strong`; calibration uses `--line`), variant radius. Form fields on login and settings are 38px.
@@ -386,6 +386,7 @@ The list page's single apply path. A sticky panel (top = bar height + 16px) hold
 - **Fitting-room: alteration ticket.** Square, ink-bordered; the head is a charcoal band with the count in tape yellow, and a 2px dashed tear line separates it from the totals and the stub of changes.
 - **Calibration: values diff.** Each selected container shows its manifest path in mono and a bordered mono diff: key path, old value struck through in vermilion, arrow, new value bold green.
 - **Empty:** "Nothing selected" with a hint and the Git-only reassurance.
+- **Motion (all themes):** the panel acknowledges each selection change. A part that appears (filled or empty state, a totals row, a resource line, a callout) settles in over 220ms (4px rise, `cubic-bezier(0.16, 1, 0.3, 1)`); a container added to the queue drops in (6px, 260ms) and keeps an accent-soft tint that fades over 1.4s; the count rolls up when it grows and down when it shrinks (280ms); a changed total flashes in the accent text for 600ms. Removals are instant. Reduced motion keeps only the tint.
 
 ### Callouts
 - **Style:** 1px border at 35% of the state colour, soft state fill, leading SVG icon in the state colour, 13px text, variant radius. Error and warning only.
@@ -405,7 +406,7 @@ Two reading panels side by side (1px line, variant radius, 16px padding) at the 
 - **Do** keep numbers tabular and right-aligned where they compare (totals, serials).
 - **Do** keep the reading's full breakdown in the hover tooltip in every variant, not in the cell.
 - **Do** keep fitting-room square (0px) and its accent text ink on yellow.
-- **Do** honour `prefers-reduced-motion`; the gauge draw-in and the default sidebar's icon motions are the only animations.
+- **Do** honour `prefers-reduced-motion`; the gauge draw-in, the default theme's section-icon motions and sliding filter highlight, and the queue panel's change feedback are the only animations.
 
 ### Don't:
 - **Don't** add per-row Accept buttons to the table; on the list, the queue panel is the single apply path.

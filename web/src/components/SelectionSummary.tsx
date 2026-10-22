@@ -142,6 +142,15 @@ function QueueList({ count, children }: { count: number; children: ReactNode }) 
   )
 }
 
+/** A total that flashes when its value changes (remounted by key). */
+function QueueValue({ children }: { children: string }) {
+  return (
+    <span className="queue-value" key={children}>
+      {children}
+    </span>
+  )
+}
+
 /**
  * One line of the values diff a selected resource will commit: the key path
  * in the binding's manifest, and its value before and after.
@@ -171,6 +180,14 @@ function DiffLine({ keyPath, from, to }: { keyPath?: string; from: string | null
  */
 export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove, onClear, onApply }: SelectionSummaryProps) {
   const theme = useTheme()
+  const changeCount = rows.reduce((n, row) => n + (row.cpu ? 1 : 0) + (row.memory ? 1 : 0), 0)
+  // The count rolls up when changes are added and down when removed
+  // (state adjusted during render, React's pattern for a previous value).
+  const [count, setCount] = useState({ value: changeCount, direction: 'up' })
+  if (count.value !== changeCount) {
+    setCount({ value: changeCount, direction: changeCount > count.value ? 'up' : 'down' })
+  }
+  const countDirection = count.direction
 
   if (rows.length === 0) {
     return (
@@ -193,7 +210,6 @@ export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove
   }))
   const selectedResources = (['cpu', 'memory'] as LimitResource[]).filter((r) => rows.some((row) => row[r]))
   const invalidSettings = plans.some((p) => p.invalid)
-  const changeCount = rows.reduce((n, row) => n + (row.cpu ? 1 : 0) + (row.memory ? 1 : 0), 0)
   const branches = [...new Set(rows.map(({ item }) => item.binding?.branch).filter((b): b is string => !!b))]
 
   let cpuTotals: Totals = { count: 0, current: 0, recommended: 0 }
@@ -225,7 +241,9 @@ export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove
     <aside className="queue" aria-label="Write-back queue">
       <div className="queue-head">
         <h2 className="queue-title">
-          <span className="queue-count">{changeCount}</span> change{changeCount === 1 ? '' : 's'} selected
+          <span className="queue-count" key={changeCount} data-direction={countDirection}>
+            {changeCount}
+          </span> change{changeCount === 1 ? '' : 's'} selected
         </h2>
         <p className="queue-sub">
           {rows.length} container{rows.length === 1 ? '' : 's'}
@@ -238,7 +256,7 @@ export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove
           <div>
             <dt>CPU requests</dt>
             <dd>
-              {formatCPUMilli(cpuTotals.current)} → {formatCPUMilli(cpuTotals.recommended)}
+              <QueueValue>{`${formatCPUMilli(cpuTotals.current)} → ${formatCPUMilli(cpuTotals.recommended)}`}</QueueValue>
               {cpuLimitTotals.count > 0 && (
                 <span className="queue-totals-limit">
                   limits {formatCPUMilli(cpuLimitTotals.current)} → {formatCPUMilli(cpuLimitTotals.recommended)}
@@ -251,7 +269,7 @@ export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove
           <div>
             <dt>Memory requests</dt>
             <dd>
-              {formatMemoryBytes(memoryTotals.current)} → {formatMemoryBytes(memoryTotals.recommended)}
+              <QueueValue>{`${formatMemoryBytes(memoryTotals.current)} → ${formatMemoryBytes(memoryTotals.recommended)}`}</QueueValue>
               {memoryLimitTotals.count > 0 && (
                 <span className="queue-totals-limit">
                   limits {formatMemoryBytes(memoryLimitTotals.current)} → {formatMemoryBytes(memoryLimitTotals.recommended)}

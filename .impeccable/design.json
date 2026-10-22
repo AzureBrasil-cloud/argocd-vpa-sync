@@ -1065,12 +1065,22 @@
       {
         "name": "nav-icon",
         "value": "440-560ms cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "Default sidebar's Lucide icons act out their section once on hover, focus-visible and arrival: gauge needle reads, history hands rewind, link halves close, cog turns one tooth; only under prefers-reduced-motion: no-preference."
+        "purpose": "Default theme's Lucide section icons act out their section once: in the sidebar on hover, focus-visible and arrival; in the page title (bare, accent) when the page opens, after 120ms. Gauge needle reads, history hands rewind, link halves close, cog turns one tooth; only under prefers-reduced-motion: no-preference."
+      },
+      {
+        "name": "segmented-slide",
+        "value": "240ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default theme: the segmented filter's single accent-soft highlight slides to the pressed option."
       },
       {
         "name": "reduced-motion",
         "value": "0.01ms",
         "purpose": "All transitions and animations collapse under prefers-reduced-motion: reduce."
+      },
+      {
+        "name": "queue-feedback",
+        "value": "220-280ms cubic-bezier(0.16, 1, 0.3, 1); tint 1400ms",
+        "purpose": "Write-back queue (all themes): appearing parts settle in, an added container drops in with a fading accent-soft tint, the count rolls in the direction it moved, a changed total flashes accent. Removals instant; reduced motion keeps only the tint."
       }
     ],
     "breakpoints": [
