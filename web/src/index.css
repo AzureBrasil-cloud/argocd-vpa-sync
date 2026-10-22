@@ -69,6 +69,51 @@
   --queue-w: 320px;
 }
 
+/* Default, dark: a composed palette, not the light one inverted. A deep
+   slate-navy canvas; surfaces step up in lightness by role (canvas, sidebar,
+   panels and table, headers and hover); text is cool off-white in three
+   steps; the blue accent and the brand teal lift to shades that hold
+   contrast on dark (accent-text 9.1:1 on the panel, brand-text 8.8:1 on
+   brand-soft); status colours get their own deep soft fills. The primary
+   button keeps the light theme's blue so white text stays at 5.2:1. */
+:root[data-theme='default'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --surface: #121a2b;
+  --surface-2: #1a2438;
+  --ink: #e2e8f0;
+  --ink-2: #b4bfd0;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b4bfd0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --ink-3: #8b97ab;
+  --line: #243047;
+  --line-strong: #34425c;
+  --head-rule: #243047;
+
+  --accent: #2563eb;
+  --accent-hover: #3b74f0;
+  --accent-ink: #ffffff;
+  --accent-soft: #16244a;
+  --accent-text: #9bbcff;
+  --link: #9bbcff;
+
+  --ok: #4ade80;
+  --ok-soft: #0f2d1f;
+  --warn: #fbbf5a;
+  --warn-soft: #33240c;
+  --bad: #f87171;
+  --bad-soft: #3a1518;
+  --rec: #6aa1ff;
+  --band: #2a3954;
+
+  --shell-bg: #0e1626;
+  --shell-ink: #e2e8f0;
+  --shell-ink-2: #8f9bb0;
+  --shell-line: #1f2a3d;
+  --brand-soft: #0e2f33;
+  --brand-text: #5fdede;
+  --backdrop: rgb(2 6 23 / 0.62);
+}
+
 :root[data-theme='fitting-room'] {
   --bg: #f6f7f5;
   --surface: #ffffff;
@@ -400,6 +445,14 @@ textarea {
   display: none;
 }
 
+/* The chip GIF is drawn on white. In dark mode it is inverted (black traces
+   turn light, the ground black) with its hue turned back so the teal stays
+   teal, and screened onto the sidebar so the black ground disappears. */
+:root[data-mode='dark'] .brand-chip img {
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: screen;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .shell-bar:is(:hover, :has(:focus-visible)) .brand-chip-live {
     display: block;
@@ -564,6 +617,77 @@ textarea {
   line-height: 1.3;
 }
 
+/* The light/dark switch: the sidebar's last item, a nav link in shape
+   (16px icon, same padding and type) that sits at the foot, right above the
+   session's hairline. */
+.mode-button {
+  width: 100%;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+:root[data-theme='default'] .mode-button {
+  margin-top: auto;
+}
+
+/* Tucked 8px above the hairline instead of the bar's 24px gap. */
+:root[data-theme='default'] .mode-button + .session {
+  margin-top: -16px;
+}
+
+.mode-icon {
+  overflow: visible;
+}
+
+.mode-icon * {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+
+/* The new icon turns in when the mode switches (it remounts by key); on
+   hover the sun's rays turn an eighth and the moon rocks, once. */
+@media (prefers-reduced-motion: no-preference) {
+  .mode-icon {
+    animation: mode-icon-in 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mode-button:is(:hover, :focus-visible) .mode-icon-sun path {
+    animation: mode-sun-rays 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mode-button:is(:hover, :focus-visible) .mode-icon-moon path {
+    animation: mode-moon-rock 560ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes mode-icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.6);
+  }
+}
+
+@keyframes mode-sun-rays {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(45deg);
+  }
+}
+
+@keyframes mode-moon-rock {
+  35% {
+    transform: rotate(-22deg);
+  }
+  70% {
+    transform: rotate(6deg);
+  }
+}
+
 .account-button .account-label {
   font-size: 12px;
 }
@@ -618,7 +742,7 @@ textarea {
 }
 
 .dialog::backdrop {
-  background: rgb(15 23 42 / 0.32);
+  background: var(--backdrop, rgb(15 23 42 / 0.32));
 }
 
 .dialog-body {
@@ -724,7 +848,7 @@ textarea {
     padding: 8px 12px;
   }
 
-  :root[data-theme='default'] :is(.brand-name, .nav-label, .account-text) {
+  :root[data-theme='default'] :is(.brand-name, .nav-label, .mode-text, .account-text) {
     white-space: nowrap;
     opacity: 0;
     transform: translateX(-6px);
@@ -733,7 +857,7 @@ textarea {
       transform 90ms ease-out;
   }
 
-  :root[data-theme='default'] .shell-bar:is(:hover, :has(:focus-visible)) :is(.brand-name, .nav-label, .account-text) {
+  :root[data-theme='default'] .shell-bar:is(:hover, :has(:focus-visible)) :is(.brand-name, .nav-label, .mode-text, .account-text) {
     opacity: 1;
     transform: none;
     transition:
@@ -746,7 +870,8 @@ textarea {
   :root[data-theme='default'] .nav-link:nth-child(2) .nav-label { --label-delay: 200ms; }
   :root[data-theme='default'] .nav-link:nth-child(3) .nav-label { --label-delay: 230ms; }
   :root[data-theme='default'] .nav-link:nth-child(4) .nav-label { --label-delay: 260ms; }
-  :root[data-theme='default'] .account-text { --label-delay: 290ms; }
+  :root[data-theme='default'] .mode-text { --label-delay: 290ms; }
+  :root[data-theme='default'] .account-text { --label-delay: 320ms; }
 }
 
 /* fitting-room and calibration: a top navbar. */
@@ -2916,7 +3041,26 @@ td.col-vpa .vpa-meta {
     border: 0;
   }
 
+  :root[data-theme='default'] .session {
+    flex-direction: row;
+  }
+
+  :root[data-theme='default'] :is(.mode-button, .account-button) {
+    width: auto;
+  }
+
+  /* In the top bar the switch sits right, beside the user button. */
+  :root[data-theme='default'] .mode-button {
+    margin-left: auto;
+  }
+
+  :root[data-theme='default'] .mode-button + .session {
+    margin-top: 0;
+    margin-left: 0;
+  }
+
   :root[data-theme='default'] .session-user,
+  :root[data-theme='default'] .mode-text,
   :root[data-theme='default'] .account-text {
     display: none;
   }

@@ -4,6 +4,7 @@ import { getUserInfo, logout, redirectToLogin } from './api/client'
 import type { UserInfo } from './api/types'
 import { AccountButton } from './components/AccountButton'
 import { BrandChip } from './components/BrandChip'
+import { ColorModeButton } from './components/ColorModeButton'
 import { Icon, Logo } from './components/Icon'
 import { NAV } from './nav'
 import { applyTheme, resolveTheme, ThemeContext, type Theme } from './theme'
@@ -68,6 +69,7 @@ export function App() {
               </NavLink>
             ))}
           </nav>
+          {theme === 'default' && <ColorModeButton />}
           {user.authEnabled && theme === 'default' && (
             <div className="session">
               <AccountButton username={user.username} onSignOut={handleLogout} />

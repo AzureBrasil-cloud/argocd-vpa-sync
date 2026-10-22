@@ -9,6 +9,10 @@ import '@fontsource-variable/public-sans'
 import '@fontsource-variable/jetbrains-mono'
 import './index.css'
 import { router } from './router'
+import { applyColorMode, resolveColorMode } from './theme'
+
+// Before the first paint, so a dark-mode viewer never sees a light flash.
+applyColorMode(resolveColorMode())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

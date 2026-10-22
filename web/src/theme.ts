@@ -44,3 +44,43 @@ export const ThemeContext = createContext<Theme>('default')
 export function useTheme(): Theme {
   return useContext(ThemeContext)
 }
+
+// The default theme's light/dark mode, a per-viewer choice kept in this
+// browser (index.css remaps the default theme's tokens under
+// [data-mode='dark']). Until the viewer picks one, it follows the system.
+export type ColorMode = 'light' | 'dark'
+
+const COLOR_MODE_KEY = 'argocd-vpa-updater.colorMode'
+
+function storedColorMode(): ColorMode | null {
+  try {
+    const value = localStorage.getItem(COLOR_MODE_KEY)
+    return value === 'light' || value === 'dark' ? value : null
+  } catch {
+    return null
+  }
+}
+
+export function systemColorMode(): ColorMode {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+export function resolveColorMode(): ColorMode {
+  return storedColorMode() ?? systemColorMode()
+}
+
+export function hasStoredColorMode(): boolean {
+  return storedColorMode() !== null
+}
+
+export function applyColorMode(mode: ColorMode): void {
+  document.documentElement.dataset.mode = mode
+}
+
+export function storeColorMode(mode: ColorMode): void {
+  try {
+    localStorage.setItem(COLOR_MODE_KEY, mode)
+  } catch {
+    // Private windows and blocked storage: the choice lasts this page only.
+  }
+}
