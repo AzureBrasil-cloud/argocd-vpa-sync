@@ -362,7 +362,7 @@ Gauges are drawn from absolutely positioned bars, ticks and clip-path arrowheads
 - **Checkbox:** 16px native, accent-coloured (ink in fitting-room); disabled at 35% opacity.
 
 ### Navigation
-- **Default:** vertical sidebar links, 14px/550, 8px 10px padding, rounded; hover surface-2; active is accent-soft fill with accent text.
+- **Default:** vertical sidebar links, 14px/550, 8px 10px padding, rounded, each led by a 16px Lucide icon (1.5 stroke, 10px gap: Gauge, History, Link2, Settings); hover surface-2; active is accent-soft fill with accent text. Each icon acts out its section once on hover, keyboard focus and arrival (440–560ms, `cubic-bezier(0.16, 1, 0.3, 1)`): the gauge needle swings back and settles, the clock hands rewind a turn, the link halves part and close, the cog turns one tooth.
 - **Fitting-room / calibration:** full-height navbar links, 13.5px/550 in shell ink-2, hover to shell ink; active gets a 3px bottom border (tape yellow / pale seal) and white text.
 - **Mobile:** brand name and username hide; the nav wraps to its own row.
 
@@ -405,7 +405,7 @@ Two reading panels side by side (1px line, variant radius, 16px padding) at the 
 - **Do** keep numbers tabular and right-aligned where they compare (totals, serials).
 - **Do** keep the reading's full breakdown in the hover tooltip in every variant, not in the cell.
 - **Do** keep fitting-room square (0px) and its accent text ink on yellow.
-- **Do** honour `prefers-reduced-motion`; the gauge draw-in is the only animation.
+- **Do** honour `prefers-reduced-motion`; the gauge draw-in and the default sidebar's icon motions are the only animations.
 
 ### Don't:
 - **Don't** add per-row Accept buttons to the table; on the list, the queue panel is the single apply path.

@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { Gauge, History, Link2, Settings } from 'lucide-react'
 import { getUserInfo, logout, redirectToLogin } from './api/client'
 import type { UserInfo } from './api/types'
 import { Icon, Logo } from './components/Icon'
 import { applyTheme, resolveTheme, ThemeContext, type Theme } from './theme'
 
+// Icons are drawn only in the default theme's sidebar; the navbar themes
+// keep text-only links. `motion` names each icon's hover/arrival animation
+// in index.css: the gauge needle takes a reading, the clock hands rewind,
+// the link's halves close, the cog turns one tooth.
 const NAV = [
-  { to: '/', label: 'Recommendations', end: true },
-  { to: '/history', label: 'Write-back history' },
-  { to: '/bindings', label: 'Bindings' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', label: 'Recommendations', icon: Gauge, motion: 'gauge', end: true },
+  { to: '/history', label: 'Write-back history', icon: History, motion: 'history' },
+  { to: '/bindings', label: 'Bindings', icon: Link2, motion: 'link' },
+  { to: '/settings', label: 'Settings', icon: Settings, motion: 'cog' },
 ]
 
 /**
@@ -60,6 +65,14 @@ export function App() {
           <nav className="nav" aria-label="Sections">
             {NAV.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end} className="nav-link">
+                {theme === 'default' && (
+                  <item.icon
+                    className={`nav-icon nav-icon-${item.motion}`}
+                    size={16}
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  />
+                )}
                 {item.label}
               </NavLink>
             ))}

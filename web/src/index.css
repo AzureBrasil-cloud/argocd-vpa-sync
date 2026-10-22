@@ -373,9 +373,94 @@ textarea {
 }
 
 :root[data-theme='default'] .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px 10px;
   border-radius: var(--radius);
   font-size: 14px;
+}
+
+:root[data-theme='default'] .nav-icon {
+  flex: none;
+  overflow: visible;
+}
+
+/* Each sidebar icon acts out its section once, on hover, keyboard focus and
+   on arrival (the rule starts matching when the link turns active). Parts
+   pivot in the icon's own 24-unit viewBox. */
+:root[data-theme='default'] .nav-icon * {
+  transform-box: view-box;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Gauge: the needle swings back and settles on its reading. */
+  :root[data-theme='default'] .nav-icon-gauge path:first-child {
+    transform-origin: 12px 14px;
+  }
+
+  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-gauge path:first-child {
+    animation: nav-gauge-read 560ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* History: the clock hands rewind a full turn. */
+  :root[data-theme='default'] .nav-icon-history path:nth-child(3) {
+    transform-origin: 12px 12px;
+  }
+
+  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-history path:nth-child(3) {
+    animation: nav-history-rewind 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Bindings: the two halves part, then close onto the bar. */
+  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-link path:first-child {
+    animation: nav-link-left 440ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-link path:nth-child(2) {
+    animation: nav-link-right 440ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Settings: the cog turns one tooth (6-fold, so it lands where it began). */
+  :root[data-theme='default'] .nav-link:is(:hover, :focus-visible, .active) .nav-icon-cog {
+    animation: nav-cog-turn 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes nav-gauge-read {
+  35% {
+    transform: rotate(-80deg);
+  }
+}
+
+@keyframes nav-history-rewind {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes nav-link-left {
+  40% {
+    transform: translateX(-2.5px);
+  }
+}
+
+@keyframes nav-link-right {
+  40% {
+    transform: translateX(2.5px);
+  }
+}
+
+@keyframes nav-cog-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(60deg);
+  }
 }
 
 :root[data-theme='default'] .nav-link:hover {
