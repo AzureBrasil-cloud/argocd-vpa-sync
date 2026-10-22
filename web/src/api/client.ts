@@ -12,16 +12,6 @@ import { beginLoad, markLoad } from '../lib/loadProgress'
 
 const SESSION_PATH = '/api/v1/session'
 
-// Development only: VITE_DEMO_LOAD_MS (e.g. in web/.env.development.local)
-// slows every page-data GET by that many milliseconds, split across the
-// loading screen's stages, so its micro-interaction can be watched. A
-// production build never reads it.
-const DEMO_LOAD_MS = import.meta.env.DEV ? Number(import.meta.env.VITE_DEMO_LOAD_MS ?? 0) || 0 : 0
-
-function pause(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 /** Sends the browser to the login page, returning here afterwards. */
 export function redirectToLogin(): void {
   const next = window.location.pathname + window.location.search
@@ -39,11 +29,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 async function send<T>(url: string, init: RequestInit | undefined, load: number | null): Promise<T> {
-  const demo = load !== null && DEMO_LOAD_MS > 0 && !url.startsWith(SESSION_PATH)
-  if (demo) await pause(DEMO_LOAD_MS * 0.6)
   const res = await fetch(url, init)
   if (load !== null) markLoad(load, 'response')
-  if (demo) await pause(DEMO_LOAD_MS * 0.4)
   if (res.status === 401 && !url.startsWith(SESSION_PATH)) {
     // Session missing or expired (e.g. the admin password changed).
     redirectToLogin()

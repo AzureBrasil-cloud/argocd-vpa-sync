@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import markLive from '../assets/brand-mark.gif'
 import markStill from '../assets/brand-mark.png'
 import { currentLoadStage, subscribeLoad, type LoadStage } from '../lib/loadProgress'
@@ -48,8 +48,11 @@ export function LoadingScreen({ title }: { title: string }) {
 
   if (!visible) return <div className="load" aria-busy="true" />
 
+  return <LoadView title={title} percent={percent} label={STAGES[stage].label} />
+}
+
+function LoadView({ title, percent, label }: { title: string; percent: number; label: string }) {
   const shown = Math.floor(percent)
-  const { label } = STAGES[stage]
   return (
     <div className="load load-visible" aria-busy="true">
       <picture className="load-mark">
@@ -74,4 +77,61 @@ export function LoadingScreen({ title }: { title: string }) {
       </p>
     </div>
   )
+}
+
+interface EntryLoaderProps {
+  title: string
+  /** The bar takes at least this long to fill, so the entrance can be seen. */
+  minDurationMs: number
+  /** The real work is over; the bar may finish. */
+  finished: boolean
+  onComplete: () => void
+}
+
+/**
+ * The entrance after signing in: the same view, shown at once and paced. The
+ * bar fills over at least `minDurationMs` but never past what the API client
+ * has really done (lib/loadProgress); it reaches 100% only once `finished`,
+ * then calls `onComplete`. The stage named under it is the band the bar is
+ * in, so the label never runs ahead of the bar or of the real stage.
+ */
+export function EntryLoader({ title, minDurationMs, finished, onComplete }: EntryLoaderProps) {
+  const [stage, setStage] = useState<LoadStage>(currentLoadStage)
+  const [percent, setPercent] = useState(0)
+  const started = useRef(0)
+  const completed = useRef(false)
+  const complete = useRef(onComplete)
+
+  useEffect(() => {
+    complete.current = onComplete
+  }, [onComplete])
+
+  useEffect(() => {
+    started.current = performance.now()
+    return subscribeLoad(() => setStage(currentLoadStage()))
+  }, [])
+
+  useEffect(() => {
+    const realCap = finished ? 100 : STAGES[stage].cap
+    let frame = 0
+    const tick = () => {
+      const timeCap = Math.min(100, ((performance.now() - started.current) / minDurationMs) * 100)
+      const target = Math.min(realCap, timeCap)
+      setPercent((p) => (target - p < 0.2 ? Math.max(p, target) : p + (target - p) * 0.12))
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [stage, finished, minDurationMs])
+
+  useEffect(() => {
+    if (!finished || percent < 100 || completed.current) return
+    completed.current = true
+    // A beat at 100% before the dashboard replaces it.
+    const timer = setTimeout(() => complete.current(), 220)
+    return () => clearTimeout(timer)
+  }, [finished, percent])
+
+  const band: LoadStage = percent < STAGES.response.from ? 'request' : percent < STAGES.done.from ? 'response' : 'done'
+  return <LoadView title={title} percent={percent} label={STAGES[band].label} />
 }

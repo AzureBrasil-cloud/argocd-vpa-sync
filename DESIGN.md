@@ -397,6 +397,7 @@ The list page's single apply path. A sticky panel (top = bar height + 16px) hold
 
 ### Loading screen
 A page waiting on its first data shows, centred in the work area (min 320px tall): the brand mark live (64px; its still frame under reduced motion), "Loading <what>" (15px/650), a 280px × 6px bar (surface-2 track, accent fill, fully rounded) and under it the stage name (12.5px ink-3) with the percentage at the right (tabular, 650, ink-2). The bar follows the API client's real stages, each owning a band: "Asking the API" 8→52%, "Receiving data" 60→88%, "Building the view" 92→99%. Within a stage it creeps toward the band's cap and never past it; the next real event jumps it on, and it never moves backward. It appears only after 150ms (fast loads show nothing), settling in over 260ms (6px rise).
+- **Sign-in entrance:** after a good sign-in the login card (min 400px tall, so it doesn't jump) swaps the form for the same view, shown at once: "Opening argocd-vpa-sync" while the dashboard's first data loads. Here the bar is paced: it fills over at least 2s but never past what the API client has really done, reaches 100% only once that request settles, holds 220ms, then the dashboard opens. The stage under it names the band the bar is in, so the label never runs ahead. Page loads are never delayed on purpose.
 
 ### Callouts
 - **Style:** 1px border at 35% of the state colour, soft state fill, leading SVG icon in the state colour, 13px text, variant radius. Error and warning only.

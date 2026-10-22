@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getUserInfo, login } from '../api/client'
+import { getUserInfo, listRecommendations, login } from '../api/client'
 import { Icon, Logo } from '../components/Icon'
+import { EntryLoader } from '../components/LoadingScreen'
 import markLive from '../assets/brand-mark.gif'
 import markStill from '../assets/brand-mark.png'
 import { applyTheme, resolveTheme, type Theme } from '../theme'
@@ -26,6 +27,10 @@ export function Login() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [theme, setTheme] = useState<Theme>(() => resolveTheme(undefined))
+  // After a good sign-in the card becomes the entrance loader while the
+  // dashboard's first data loads; `ready` once that request has settled.
+  const [entering, setEntering] = useState(false)
+  const [ready, setReady] = useState(false)
 
   // The theme comes from the same unauthenticated endpoint the shell uses.
   useEffect(() => {
@@ -44,7 +49,11 @@ export function Login() {
     setError(null)
     try {
       await login(username, password)
-      navigate(safeNext(params.get('next')), { replace: true })
+      setEntering(true)
+      // Warms the first screen; a failure here is the dashboard's to report.
+      listRecommendations()
+        .catch(() => undefined)
+        .finally(() => setReady(true))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(
@@ -56,6 +65,21 @@ export function Login() {
       )
       setSubmitting(false)
     }
+  }
+
+  if (entering) {
+    return (
+      <main className="login">
+        <div className="login-form login-entering">
+          <EntryLoader
+            title="Opening argocd-vpa-sync"
+            minDurationMs={2000}
+            finished={ready}
+            onComplete={() => navigate(safeNext(params.get('next')), { replace: true })}
+          />
+        </div>
+      </main>
+    )
   }
 
   return (

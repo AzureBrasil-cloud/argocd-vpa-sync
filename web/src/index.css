@@ -3073,6 +3073,18 @@ td.col-vpa .vpa-meta {
   margin-top: -6px;
 }
 
+/* After signing in, the card holds the entrance loader, about the height of
+   the form it replaces so the card doesn't jump. */
+.login-entering {
+  min-height: 400px;
+  align-content: center;
+}
+
+.login-entering .load {
+  min-height: 0;
+  padding: 0;
+}
+
 /* Default: the sign-in card leads with the mark centred and the product
    name under it, the line below centred with them; the card breathes more. */
 :root[data-theme='default'] .login-form {
