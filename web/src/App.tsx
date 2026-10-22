@@ -5,7 +5,7 @@ import type { UserInfo } from './api/types'
 import { AccountButton } from './components/AccountButton'
 import { BrandMark } from './components/BrandMark'
 import { ColorModeButton } from './components/ColorModeButton'
-import { Icon, Logo } from './components/Icon'
+import { Icon } from './components/Icon'
 import { NAV } from './nav'
 import { applyTheme, resolveTheme, ThemeContext, type Theme } from './theme'
 
@@ -51,7 +51,7 @@ export function App() {
         </a>
         <header className="shell-bar">
           <NavLink to="/" className="brand" end>
-            {theme === 'calibration' ? <Logo /> : <BrandMark />}
+            <BrandMark />
             <span className="brand-name">argocd-vpa-sync</span>
           </NavLink>
           <nav className="nav" aria-label="Sections">
@@ -77,7 +77,6 @@ export function App() {
           )}
           {user.authEnabled && theme !== 'default' && (
             <div className="session">
-              {theme !== 'fitting-room' && <span className="session-user">{user.username}</span>}
               <button className="btn btn-small btn-shell" onClick={handleLogout} aria-label="Sign out">
                 <Icon name="sign-out" />
                 <span className="btn-label">Sign out</span>

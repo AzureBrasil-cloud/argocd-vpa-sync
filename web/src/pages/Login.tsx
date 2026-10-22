@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getUserInfo, listRecommendations, login } from '../api/client'
-import { Icon, Logo } from '../components/Icon'
+import { Icon } from '../components/Icon'
 import { EntryLoader } from '../components/LoadingScreen'
 import markLive from '../assets/brand-mark.gif'
 import markStill from '../assets/brand-mark.png'
-import { applyTheme, resolveTheme, type Theme } from '../theme'
+import { applyTheme, resolveTheme } from '../theme'
 
 /**
  * Where to go after logging in: the ?next= path, but only a same-origin
@@ -26,7 +26,6 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [theme, setTheme] = useState<Theme>(() => resolveTheme(undefined))
   // After a good sign-in the card becomes the entrance loader while the
   // dashboard's first data loads; `ready` once that request has settled.
   const [entering, setEntering] = useState(false)
@@ -34,13 +33,9 @@ export function Login() {
 
   // The theme comes from the same unauthenticated endpoint the shell uses.
   useEffect(() => {
-    const show = (next: Theme) => {
-      applyTheme(next)
-      setTheme(next)
-    }
     getUserInfo()
-      .then((info) => show(resolveTheme(info.theme)))
-      .catch(() => show(resolveTheme(undefined)))
+      .then((info) => applyTheme(resolveTheme(info.theme)))
+      .catch(() => applyTheme(resolveTheme(undefined)))
   }, [])
 
   async function handleSubmit(e: FormEvent) {
@@ -86,17 +81,12 @@ export function Login() {
     <main className="login">
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="login-brand">
-          {theme !== 'calibration' ? (
-            // The flow mark (default and fitting-room), live here (its still frame under
-            // reduced motion): the sign-in screen is where it introduces
-            // the product.
-            <picture className="login-mark" aria-hidden="true">
-              <source srcSet={markStill} media="(prefers-reduced-motion: reduce)" />
-              <img src={markLive} alt="" width={56} height={56} />
-            </picture>
-          ) : (
-            <Logo />
-          )}
+          {/* The product mark, live here (its still frame under reduced
+              motion): the sign-in screen is where it introduces the product. */}
+          <picture className="login-mark" aria-hidden="true">
+            <source srcSet={markStill} media="(prefers-reduced-motion: reduce)" />
+            <img src={markLive} alt="" width={56} height={56} />
+          </picture>
           <h1>argocd-vpa-sync</h1>
         </div>
         <p className="login-sub">Sign in to review VPA recommendations and queue write-backs to Git.</p>

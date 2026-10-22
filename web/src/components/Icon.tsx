@@ -70,17 +70,3 @@ export function Icon({ name, label, className }: IconProps) {
     </svg>
   )
 }
-
-/**
- * The product mark: a request tick inside a recommended range -- the one
- * idea every theme draws, kept as the logo in all of them.
- */
-export function Logo() {
-  return (
-    <svg className="logo" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
-      <rect className="logo-band" x="3" y="9" width="18" height="6" />
-      <path className="logo-scale" d="M3 19h18M3 17v2M7.5 18v1M12 17v2M16.5 18v1M21 17v2" />
-      <path className="logo-tick" d="M10 5v14" />
-    </svg>
-  )
-}
