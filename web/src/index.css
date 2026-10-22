@@ -44,8 +44,15 @@
   --shell-ink: #0f172a;
   --shell-ink-2: #5b6474;
   --shell-line: #e2e8f0;
-  --shell-active-bg: #eff6ff;
-  --shell-active-ink: #1d4ed8;
+  /* Brand teal, from the sidebar's chip mark (#33cccc). It colours the shell
+     and section marks; actions and data keep the blue accent. --brand-text
+     is the shade dark enough for text and icons (5.1:1 on white, 4.7:1 on
+     --brand-soft). */
+  --brand: #33cccc;
+  --brand-soft: #e6f8f8;
+  --brand-text: #0f7a7a;
+  --shell-active-bg: var(--brand-soft);
+  --shell-active-ink: var(--brand-text);
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -370,7 +377,33 @@ textarea {
 }
 
 :root[data-theme='default'] .brand {
-  padding: 0 8px;
+  padding: 0 6px;
+}
+
+/* Default's mark: the still chip at rest, the looping GIF only while the
+   sidebar is open (and never under reduced motion). */
+.brand-chip {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.brand-chip img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.brand-chip-live {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell-bar:is(:hover, :has(:focus-visible)) .brand-chip-live {
+    display: block;
+  }
 }
 
 :root[data-theme='default'] .nav {
@@ -520,9 +553,9 @@ textarea {
 }
 
 .account-button:hover .account-badge {
-  background: var(--accent-soft);
+  background: var(--brand-soft);
   border-color: transparent;
-  color: var(--accent-text);
+  color: var(--brand-text);
 }
 
 .account-text {
@@ -607,8 +640,8 @@ textarea {
   height: 40px;
   flex: none;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: var(--brand-soft);
+  color: var(--brand-text);
 }
 
 .account-label {
@@ -659,23 +692,28 @@ textarea {
 /* Default on desktop: the sidebar rests as a 64px rail of icons and expands
    to its full 208px while the pointer is on it (or keyboard focus is in it).
    Its grid column is what grows, so the page narrows and widens with it and
-   nothing is ever covered. The width opens first and the labels fade in once
-   there is room; collapsing waits a beat so a pointer passing by doesn't
-   snap it shut. */
+   nothing is ever covered.
+   Opening is the longer, softer move: the column glides out on a long
+   deceleration, then the labels follow it in, top to bottom, each sliding a
+   few pixels toward its icon as it fades up. Closing is quicker and in one
+   piece: the labels drop out at once and the column folds back. The rail
+   waits a beat before closing so a pointer passing by doesn't snap it. */
 @media (min-width: 861px) {
   :root[data-theme='default'] {
     --rail-w: 64px;
     --sidebar-w: 208px;
+    --rail-open: cubic-bezier(0.32, 0.72, 0, 1);
+    --rail-close: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   :root[data-theme='default'] .shell {
     grid-template-columns: var(--rail-w) minmax(0, 1fr);
-    transition: grid-template-columns 240ms cubic-bezier(0.16, 1, 0.3, 1) 140ms;
+    transition: grid-template-columns 220ms var(--rail-close) 160ms;
   }
 
   :root[data-theme='default'] .shell:has(> .shell-bar:is(:hover, :has(:focus-visible))) {
     grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-    transition-delay: 60ms;
+    transition: grid-template-columns 360ms var(--rail-open) 60ms;
   }
 
   :root[data-theme='default'] .shell-bar {
@@ -689,13 +727,26 @@ textarea {
   :root[data-theme='default'] :is(.brand-name, .nav-label, .account-text) {
     white-space: nowrap;
     opacity: 0;
-    transition: opacity 100ms ease-out;
+    transform: translateX(-6px);
+    transition:
+      opacity 90ms ease-out,
+      transform 90ms ease-out;
   }
 
   :root[data-theme='default'] .shell-bar:is(:hover, :has(:focus-visible)) :is(.brand-name, .nav-label, .account-text) {
     opacity: 1;
-    transition: opacity 180ms ease-out 140ms;
+    transform: none;
+    transition:
+      opacity 220ms ease-out var(--label-delay, 140ms),
+      transform 320ms var(--rail-open) var(--label-delay, 140ms);
   }
+
+  /* Labels arrive top to bottom, 30ms apart. */
+  :root[data-theme='default'] .nav-link:nth-child(1) .nav-label { --label-delay: 170ms; }
+  :root[data-theme='default'] .nav-link:nth-child(2) .nav-label { --label-delay: 200ms; }
+  :root[data-theme='default'] .nav-link:nth-child(3) .nav-label { --label-delay: 230ms; }
+  :root[data-theme='default'] .nav-link:nth-child(4) .nav-label { --label-delay: 260ms; }
+  :root[data-theme='default'] .account-text { --label-delay: 290ms; }
 }
 
 /* fitting-room and calibration: a top navbar. */
@@ -801,7 +852,7 @@ textarea {
 
 .page-title-icon {
   flex: none;
-  color: var(--accent-text);
+  color: var(--brand-text);
 }
 
 /* Default: the header is its own band above the work, closed by a
@@ -2121,10 +2172,9 @@ td.col-vpa .vpa-meta {
     animation: queue-part-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  /* The tint blooms as the chip flown from the table lands (lib/flyToQueue). */
   .queue-item {
-    animation:
-      queue-item-in 260ms cubic-bezier(0.16, 1, 0.3, 1),
-      queue-item-tint 1400ms cubic-bezier(0.4, 0, 0.2, 1);
+    animation: queue-item-tint 1400ms cubic-bezier(0.4, 0, 0.2, 1) 420ms backwards;
   }
 
   .queue-count {
@@ -2155,11 +2205,24 @@ td.col-vpa .vpa-meta {
   }
 }
 
-@keyframes queue-item-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
+/* The chip that carries a picked resource from the table to the queue. */
+.queue-flyer-x {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.queue-flyer {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes queue-item-tint {

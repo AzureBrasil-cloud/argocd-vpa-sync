@@ -8,6 +8,7 @@ import { Icon } from "../components/Icon";
 import { PageTitle } from "../components/PageTitle";
 import { ResourceCheckbox } from "../components/ResourceCheckbox";
 import { ResourceReading } from "../components/ResourceReading";
+import { flyToQueue } from "../lib/flyToQueue";
 import { Segmented } from "../components/Segmented";
 import { SelectionSummary, type SelectedRow } from "../components/SelectionSummary";
 import { StatusBadge } from "../components/StatusBadge";
@@ -576,7 +577,13 @@ export function RecommendationList() {
                               eligible={resource === "cpu" ? item.cpuEligible : item.memoryEligible}
                               reasons={resource === "cpu" ? item.cpuEligibilityReasons : item.memoryEligibilityReasons}
                               checked={sel[resource]}
-                              onChange={(checked) => toggle(key, resource, checked)}
+                              onChange={(checked, input) => {
+                                toggle(key, resource, checked);
+                                if (checked) {
+                                  const target = resource === "cpu" ? item.targetCpu : item.targetMemory;
+                                  flyToQueue(input, key, `${resource === "cpu" ? "cpu" : "mem"} ${target ?? ""}`.trim());
+                                }
+                              }}
                             />
                             <ResourceReading item={item} resource={resource} />
                           </div>

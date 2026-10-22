@@ -282,7 +282,11 @@ export function SelectionSummary({ rows, busy, error, limits, headroom, onRemove
 
       <QueueList count={rows.length}>
         {rows.map(({ item }, i) => (
-          <li key={`${item.namespace}/${item.vpaName}/${item.containerName}`} className="queue-item">
+          <li
+            key={`${item.namespace}/${item.vpaName}/${item.containerName}`}
+            className="queue-item"
+            data-key={`${item.namespace}/${item.vpaName}/${item.containerName}`}
+          >
             <div className="queue-item-head">
               <span className="queue-item-name">
                 {item.namespace}/{item.vpaName}

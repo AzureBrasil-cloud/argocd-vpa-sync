@@ -6,7 +6,8 @@ interface ResourceCheckboxProps {
   eligible: boolean
   reasons?: string[]
   checked: boolean
-  onChange: (checked: boolean) => void
+  /** Also receives the checkbox, for motion that starts from it. */
+  onChange: (checked: boolean, input: HTMLInputElement) => void
   label: string
 }
 
@@ -29,7 +30,7 @@ export function ResourceCheckbox({ configured, eligible, reasons, checked, onCha
       checked={checked}
       disabled={!eligible}
       aria-label={label}
-      onChange={(e) => onChange(e.target.checked)}
+      onChange={(e) => onChange(e.target.checked, e.currentTarget)}
     />
   )
   if (eligible) return checkbox
