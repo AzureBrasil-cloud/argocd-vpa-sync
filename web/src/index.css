@@ -482,8 +482,220 @@ textarea {
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  padding: 12px 8px 0;
+  padding: 12px 2px 0;
   border-top: 1px solid var(--shell-line);
+}
+
+/* Default: the session is one button (the user badge, "Signed in as" and
+   the username) that opens the account dialog. On hover and keyboard focus
+   the figure lifts its head, the same one-shot acting the section icons do. */
+.account-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-badge {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-2);
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.account-button:hover .account-badge {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.account-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.account-button .account-label {
+  font-size: 12px;
+}
+
+.account-button .account-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-icon {
+  overflow: visible;
+}
+
+.account-icon * {
+  transform-box: view-box;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .account-button:is(:hover, :focus-visible) .account-icon circle {
+    animation: account-head 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .account-button:is(:hover, :focus-visible) .account-icon path {
+    animation: account-shoulders 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes account-head {
+  35% {
+    transform: translateY(-2.5px);
+  }
+}
+
+@keyframes account-shoulders {
+  45% {
+    transform: translateY(-1px);
+  }
+}
+
+/* The account dialog: flat like every other surface, set apart by the
+   dimmed page behind it. */
+.dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.dialog::backdrop {
+  background: rgb(15 23 42 / 0.32);
+}
+
+.dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.account-label {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.account-name {
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.dialog-text {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog[open] {
+    animation: dialog-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .dialog[open]::backdrop {
+    animation: dialog-backdrop-in 200ms ease-out;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Default on desktop: the sidebar rests as a 64px rail of icons and expands
+   to its full 208px while the pointer is on it (or keyboard focus is in it).
+   Its grid column is what grows, so the page narrows and widens with it and
+   nothing is ever covered. The width opens first and the labels fade in once
+   there is room; collapsing waits a beat so a pointer passing by doesn't
+   snap it shut. */
+@media (min-width: 861px) {
+  :root[data-theme='default'] {
+    --rail-w: 64px;
+    --sidebar-w: 208px;
+  }
+
+  :root[data-theme='default'] .shell {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    transition: grid-template-columns 240ms cubic-bezier(0.16, 1, 0.3, 1) 140ms;
+  }
+
+  :root[data-theme='default'] .shell:has(> .shell-bar:is(:hover, :has(:focus-visible))) {
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    transition-delay: 60ms;
+  }
+
+  :root[data-theme='default'] .shell-bar {
+    overflow: hidden;
+  }
+
+  :root[data-theme='default'] .nav-link {
+    padding: 8px 12px;
+  }
+
+  :root[data-theme='default'] :is(.brand-name, .nav-label, .account-text) {
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+  }
+
+  :root[data-theme='default'] .shell-bar:is(:hover, :has(:focus-visible)) :is(.brand-name, .nav-label, .account-text) {
+    opacity: 1;
+    transition: opacity 180ms ease-out 140ms;
+  }
 }
 
 /* fitting-room and calibration: a top navbar. */
@@ -2641,7 +2853,8 @@ td.col-vpa .vpa-meta {
     border: 0;
   }
 
-  :root[data-theme='default'] .session-user {
+  :root[data-theme='default'] .session-user,
+  :root[data-theme='default'] .account-text {
     display: none;
   }
 

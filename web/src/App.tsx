@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { getUserInfo, logout, redirectToLogin } from './api/client'
 import type { UserInfo } from './api/types'
+import { AccountButton } from './components/AccountButton'
 import { Icon, Logo } from './components/Icon'
 import { NAV } from './nav'
 import { applyTheme, resolveTheme, ThemeContext, type Theme } from './theme'
@@ -62,11 +63,16 @@ export function App() {
                     aria-hidden="true"
                   />
                 )}
-                {item.label}
+                <span className="nav-label">{item.label}</span>
               </NavLink>
             ))}
           </nav>
-          {user.authEnabled && (
+          {user.authEnabled && theme === 'default' && (
+            <div className="session">
+              <AccountButton username={user.username} onSignOut={handleLogout} />
+            </div>
+          )}
+          {user.authEnabled && theme !== 'default' && (
             <div className="session">
               <span className="session-user">{user.username}</span>
               <button className="btn btn-small btn-shell" onClick={handleLogout} aria-label="Sign out">
