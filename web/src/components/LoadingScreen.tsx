@@ -54,7 +54,7 @@ export function LoadingScreen({ title }: { title: string }) {
     <div className="load load-visible" aria-busy="true">
       <picture className="load-mark">
         <source srcSet={markStill} media="(prefers-reduced-motion: reduce)" />
-        <img src={markLive} alt="" width={88} height={88} />
+        <img src={markLive} alt="" width={64} height={64} />
       </picture>
       <p className="load-title">{title}</p>
       <div

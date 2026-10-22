@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getSettings } from '../api/client'
 import type { SettingsDTO } from '../api/types'
 import { Icon } from '../components/Icon'
+import { LoadingScreen } from '../components/LoadingScreen'
 import { PageTitle } from '../components/PageTitle'
 import { RequestHeadroomInput } from '../components/RequestHeadroomInput'
 import { useRequestHeadroom } from '../lib/useRequestHeadroom'
@@ -52,99 +53,105 @@ export function Settings() {
         </div>
       )}
 
-      <section className="settings-section" aria-labelledby="settings-theme">
-        <h2 id="settings-theme">Theme</h2>
-        <ul className="theme-list">
-          {THEMES.map((t) => (
-            <li key={t} className={t === theme ? 'is-current' : undefined}>
-              <span className="theme-name">
-                {THEME_LABELS[t]} <code>{t}</code>
-                {t === theme && <span className="tag">in use</span>}
-              </span>
-              <span className="cell-sub">{THEME_NOTES[t]}</span>
-            </li>
-          ))}
-        </ul>
-        <pre className="snippet">
-          <code>{`helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \\
-  -n argocd --reuse-values --set theme=fitting-room`}</code>
-        </pre>
-      </section>
-
-      {settings && (
+      {!settings && !error ? (
+        <LoadingScreen title="Loading settings" />
+      ) : (
         <>
-          <section className="settings-section" aria-labelledby="settings-writeback">
-            <h2 id="settings-writeback">Write-back</h2>
-            <dl className="facts facts-stacked">
-              <div>
-                <dt>Worker poll interval</dt>
-                <dd>{formatDuration(settings.writeBackPollIntervalSeconds)}</dd>
-              </div>
-              <div>
-                <dt>Argo CD namespace</dt>
-                <dd>{settings.argocdNamespace}</dd>
-              </div>
-              <div>
-                <dt>State Secret</dt>
-                <dd className="mono-path">
-                  {settings.stateSecretNamespace}/{settings.stateSecretName}
-                </dd>
-              </div>
-            </dl>
+          <section className="settings-section" aria-labelledby="settings-theme">
+            <h2 id="settings-theme">Theme</h2>
+            <ul className="theme-list">
+              {THEMES.map((t) => (
+                <li key={t} className={t === theme ? 'is-current' : undefined}>
+                  <span className="theme-name">
+                    {THEME_LABELS[t]} <code>{t}</code>
+                    {t === theme && <span className="tag">in use</span>}
+                  </span>
+                  <span className="cell-sub">{THEME_NOTES[t]}</span>
+                </li>
+              ))}
+            </ul>
+            <pre className="snippet">
+              <code>{`helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \\
+      -n argocd --reuse-values --set theme=fitting-room`}</code>
+            </pre>
           </section>
 
-          <section className="settings-section" aria-labelledby="settings-auth">
-            <h2 id="settings-auth">Authentication</h2>
-            <dl className="facts facts-stacked">
-              <div>
-                <dt>Login</dt>
-                <dd>{settings.authEnabled ? 'Required (admin password set)' : 'Off: the dashboard is open to anyone who can reach it'}</dd>
-              </div>
-              {settings.authEnabled && (
-                <>
+          {settings && (
+            <>
+              <section className="settings-section" aria-labelledby="settings-writeback">
+                <h2 id="settings-writeback">Write-back</h2>
+                <dl className="facts facts-stacked">
                   <div>
-                    <dt>Username</dt>
-                    <dd>{settings.username}</dd>
+                    <dt>Worker poll interval</dt>
+                    <dd>{formatDuration(settings.writeBackPollIntervalSeconds)}</dd>
                   </div>
                   <div>
-                    <dt>Session length</dt>
-                    <dd>{formatDuration(settings.sessionTtlSeconds)}</dd>
+                    <dt>Argo CD namespace</dt>
+                    <dd>{settings.argocdNamespace}</dd>
                   </div>
-                </>
-              )}
-            </dl>
-          </section>
+                  <div>
+                    <dt>State Secret</dt>
+                    <dd className="mono-path">
+                      {settings.stateSecretNamespace}/{settings.stateSecretName}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
 
-          <section className="settings-section" aria-labelledby="settings-version">
-            <h2 id="settings-version">Version</h2>
-            <dl className="facts facts-stacked">
-              <div>
-                <dt>Version</dt>
-                <dd>{settings.version}</dd>
-              </div>
-              <div>
-                <dt>Commit</dt>
-                <dd>
-                  <code className="sha">{settings.gitCommit}</code>
-                </dd>
-              </div>
-              <div>
-                <dt>Built</dt>
-                <dd>{settings.buildDate}</dd>
-              </div>
-            </dl>
+              <section className="settings-section" aria-labelledby="settings-auth">
+                <h2 id="settings-auth">Authentication</h2>
+                <dl className="facts facts-stacked">
+                  <div>
+                    <dt>Login</dt>
+                    <dd>{settings.authEnabled ? 'Required (admin password set)' : 'Off: the dashboard is open to anyone who can reach it'}</dd>
+                  </div>
+                  {settings.authEnabled && (
+                    <>
+                      <div>
+                        <dt>Username</dt>
+                        <dd>{settings.username}</dd>
+                      </div>
+                      <div>
+                        <dt>Session length</dt>
+                        <dd>{formatDuration(settings.sessionTtlSeconds)}</dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+              </section>
+
+              <section className="settings-section" aria-labelledby="settings-version">
+                <h2 id="settings-version">Version</h2>
+                <dl className="facts facts-stacked">
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{settings.version}</dd>
+                  </div>
+                  <div>
+                    <dt>Commit</dt>
+                    <dd>
+                      <code className="sha">{settings.gitCommit}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Built</dt>
+                    <dd>{settings.buildDate}</dd>
+                  </div>
+                </dl>
+              </section>
+            </>
+          )}
+
+          <section className="settings-section" aria-labelledby="settings-browser">
+            <h2 id="settings-browser">Defaults in this browser</h2>
+            <p className="cell-sub">
+              The request headroom new selections start with. It is remembered in this browser only; limit settings are chosen in
+              the write-back queue.
+            </p>
+            <RequestHeadroomInput settings={headroom} resources={['cpu', 'memory']} />
           </section>
         </>
       )}
-
-      <section className="settings-section" aria-labelledby="settings-browser">
-        <h2 id="settings-browser">Defaults in this browser</h2>
-        <p className="cell-sub">
-          The request headroom new selections start with. It is remembered in this browser only; limit settings are chosen in
-          the write-back queue.
-        </p>
-        <RequestHeadroomInput settings={headroom} resources={['cpu', 'memory']} />
-      </section>
     </div>
   )
 }
