@@ -958,7 +958,8 @@ textarea {
 }
 
 /* Default: the section's sidebar icon leads the title, bare and in the
-   accent, and acts out its section once when the page opens. */
+   title's own ink (the sidebar keeps its colours), and acts out its section
+   once when the page opens. */
 :root[data-theme='default'] .page-title:has(.page-title-icon) {
   --motion-delay: 120ms;
   display: flex;
@@ -968,7 +969,7 @@ textarea {
 
 .page-title-icon {
   flex: none;
-  color: var(--accent-text);
+  color: inherit;
 }
 
 /* Default: the header is its own band above the work, closed by a
