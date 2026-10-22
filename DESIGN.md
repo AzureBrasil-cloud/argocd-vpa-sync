@@ -258,9 +258,8 @@ Depth is flat. Surfaces sit on hairlines, not shadows; the one lifted object is 
 Each variant is a light, low-chroma ground with one committed accent and a fixed trio of state colours (ok, warn, bad) plus a recommendation colour (`--rec`) and a range-band grey (`--band`).
 
 ### Primary
-- **Console Blue** (default-accent): default's primary button, selected-row tint (via default-accent-soft), checkbox fill and focus ring (via its hover shade).
-- **Brand Teal** (default `--brand` #33cccc, from the chip mark; `--brand-soft` #e6f8f8; `--brand-text` #0f7a7a, 5.1:1 on white and 4.7:1 on brand-soft): default's shell and section marks only. The active sidebar link (brand-soft fill, brand-text label and icon), each page title's section icon, the user badge's hover and the account dialog's avatar. Actions and data stay Console Blue.
-- **Default dark mode** (`[data-mode='dark']`, a per-viewer choice): composed, not inverted. Canvas #0b1120, sidebar #0e1626, panels and table #121a2b, headers and hover #1a2438; ink #e2e8f0 / #b4bfd0 / #8b97ab; lines #243047 / #34425c. Accent text lifts to #9bbcff (9.1:1 on panels) on a #16244a soft fill; the primary button keeps #2563eb (white text 5.2:1). Brand teal text #5fdede on #0e2f33 (8.8:1). Status: ok #4ade80 on #0f2d1f, warn #fbbf5a on #33240c, bad #f87171 on #3a1518. The chip mark is inverted with its hue turned back and screened, so its white ground drops out and the teal stays teal.
+- **Console Blue** (default-accent): default's primary button, selected-row tint (via default-accent-soft), active sidebar link (accent-soft fill, accent-text label and icon), each page title's section icon, the user badge's hover and the account dialog's avatar, checkbox fill and focus ring (via its hover shade).
+- **Default dark mode** (`[data-mode='dark']`, a per-viewer choice): composed, not inverted. Canvas #0b1120, sidebar #0e1626, panels and table #121a2b, headers and hover #1a2438; ink #e2e8f0 / #b4bfd0 / #8b97ab; lines #243047 / #34425c. Accent text lifts to #9bbcff (9.1:1 on panels, 8:1 on its #16244a soft fill), which also carries the active sidebar link and the section icons; the primary button keeps #2563eb (white text 5.2:1). Status: ok #4ade80 on #0f2d1f, warn #fbbf5a on #33240c, bad #f87171 on #3a1518. The chip mark is inverted with its hue turned back and screened, so its white ground drops out and the teal stays teal.
 - **Tape Yellow** (fitting-room-accent): fitting-room's committed accent. Fills the primary button (with a 1px ink border), the pressed segmented filter, the active navbar underline (3px), selection highlight, the queue count, and the selected-row tint (via fitting-room-accent-soft). Text on it is always ink, never white.
 - **Seal Blue** (calibration-accent): calibration's primary button, links, pressed segment text and selected-row tint (via calibration-accent-soft).
 
@@ -352,6 +351,10 @@ Gauges are drawn from absolutely positioned bars, ticks and clip-path arrowheads
 - **Disabled:** 45% opacity, not-allowed cursor.
 - **Link button:** underlined text in `--link` ("Clear selection").
 - **Icon button:** 26px square, transparent until hover (line border, surface-2).
+
+### Select eligible
+- **Style:** three small buttons ("CPU + memory", "Memory", "CPU") after a muted label, acting on the rows on screen; ticking is additive.
+- **Pressed:** the option the selection currently matches (all eligible changes on screen of both resources, of memory only, or of CPU only) shows pressed: accent-soft fill, accent-text border and label, and a leading check (Lucide Check, 14px) so the state isn't colour alone; tape yellow with ink in fitting-room. It is read from the selection, so unticking a row clears it; pressing the pressed option again unticks those resources.
 
 ### Segmented filter
 - **Style:** one bordered group (All / Eligible / Not eligible) with counts in `--ink-3`; 30px tall.

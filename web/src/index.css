@@ -44,15 +44,10 @@
   --shell-ink: #0f172a;
   --shell-ink-2: #5b6474;
   --shell-line: #e2e8f0;
-  /* Brand teal, from the sidebar's chip mark (#33cccc). It colours the shell
-     and section marks; actions and data keep the blue accent. --brand-text
-     is the shade dark enough for text and icons (5.1:1 on white, 4.7:1 on
-     --brand-soft). */
-  --brand: #33cccc;
-  --brand-soft: #e6f8f8;
-  --brand-text: #0f7a7a;
-  --shell-active-bg: var(--brand-soft);
-  --shell-active-ink: var(--brand-text);
+  /* The shell's active link and the section marks share the console blue
+     (follows the accent into dark mode). */
+  --shell-active-bg: var(--accent-soft);
+  --shell-active-ink: var(--accent-text);
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -72,9 +67,8 @@
 /* Default, dark: a composed palette, not the light one inverted. A deep
    slate-navy canvas; surfaces step up in lightness by role (canvas, sidebar,
    panels and table, headers and hover); text is cool off-white in three
-   steps; the blue accent and the brand teal lift to shades that hold
-   contrast on dark (accent-text 9.1:1 on the panel, brand-text 8.8:1 on
-   brand-soft); status colours get their own deep soft fills. The primary
+   steps; the blue accent lifts to a shade that holds contrast on dark
+   (accent-text 9.1:1 on the panel, 8:1 on accent-soft); status colours get their own deep soft fills. The primary
    button keeps the light theme's blue so white text stays at 5.2:1. */
 :root[data-theme='default'][data-mode='dark'] {
   color-scheme: dark;
@@ -109,8 +103,6 @@
   --shell-ink: #e2e8f0;
   --shell-ink-2: #8f9bb0;
   --shell-line: #1f2a3d;
-  --brand-soft: #0e2f33;
-  --brand-text: #5fdede;
   --backdrop: rgb(2 6 23 / 0.62);
 }
 
@@ -606,9 +598,9 @@ textarea {
 }
 
 .account-button:hover .account-badge {
-  background: var(--brand-soft);
+  background: var(--accent-soft);
   border-color: transparent;
-  color: var(--brand-text);
+  color: var(--accent-text);
 }
 
 .account-text {
@@ -764,8 +756,8 @@ textarea {
   height: 40px;
   flex: none;
   border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand-text);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .account-label {
@@ -977,7 +969,7 @@ textarea {
 
 .page-title-icon {
   flex: none;
-  color: var(--brand-text);
+  color: var(--accent-text);
 }
 
 /* Default: the header is its own band above the work, closed by a
@@ -1419,6 +1411,23 @@ input[type='checkbox']:disabled {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+/* A pressed toggle button (the "Select eligible" option the selection
+   matches): accent-soft fill, accent text and border, and a check mark, so
+   the state doesn't rest on colour alone. */
+.btn-toggle[aria-pressed='true'],
+.btn-toggle[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+
+:root[data-theme='fitting-room'] .btn-toggle[aria-pressed='true'],
+:root[data-theme='fitting-room'] .btn-toggle[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--ink);
+  color: var(--accent-ink);
 }
 
 .select-eligible-label {

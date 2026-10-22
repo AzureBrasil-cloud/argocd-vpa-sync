@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import { selectRecommendation } from "../api/client";
 import type { RecommendationDTO, RecommendationStatus, SelectRequest } from "../api/types";
 import { EligibilityBadge } from "../components/EligibilityBadge";
@@ -229,6 +229,23 @@ export function RecommendationList() {
     });
   }
 
+  // The reverse of selectEligible: unticks those resources on every row on
+  // screen, leaving the other resource's picks alone.
+  function deselectEligible(clearCPU: boolean, clearMemory: boolean) {
+    setSelection((prev) => {
+      const next = { ...prev };
+      for (const item of visibleItems) {
+        const key = rowKey(item);
+        const existing = next[key];
+        if (!existing) continue;
+        const sel = { cpu: clearCPU ? false : existing.cpu, memory: clearMemory ? false : existing.memory };
+        if (sel.cpu || sel.memory) next[key] = sel;
+        else delete next[key];
+      }
+      return next;
+    });
+  }
+
   function removeFromSelection(namespace: string, vpaName: string, containerName: string) {
     setRow(rowKey({ namespace, vpaName, containerName }), EMPTY_SELECTION);
   }
@@ -340,21 +357,53 @@ export function RecommendationList() {
       return sel && (!canCPU(i) || sel.cpu) && (!canMemory(i) || sel.memory);
     });
 
+  // Which "Select eligible" option the current selection matches, so the
+  // reviewer sees what is picked: every eligible change on screen of both
+  // resources, of memory only, or of CPU only. It is read from the
+  // selection, so unticking a row in the table clears it too.
+  const allCPUPicked = visibleItems.filter(canCPU).every((i) => selection[rowKey(i)]?.cpu);
+  const allMemoryPicked = visibleItems.filter(canMemory).every((i) => selection[rowKey(i)]?.memory);
+  const pickedEligible =
+    !anyCPU && !anyMemory
+      ? null
+      : allCPUPicked && allMemoryPicked
+        ? "both"
+        : anyMemory && allMemoryPicked
+          ? "memory"
+          : anyCPU && allCPUPicked
+            ? "cpu"
+            : null;
+
+  const selectEligibleOptions = [
+    { value: "both", label: "CPU + memory", cpu: true, memory: true, disabled: !anyCPU && !anyMemory },
+    { value: "memory", label: "Memory", cpu: false, memory: true, disabled: !anyMemory },
+    { value: "cpu", label: "CPU", cpu: true, memory: false, disabled: !anyCPU },
+  ] as const;
+
   // Bulk actions on what is on screen. The default theme puts them on the
   // guide line, which names exactly that set; the navbar themes keep them in
-  // the filter row, where the guide line carries the gauge legend.
+  // the filter row, where the guide line carries the gauge legend. The option
+  // the selection matches is pressed; pressing it again unticks it.
   const selectEligibleGroup = (
     <div className="select-eligible" role="group" aria-label="Select eligible changes on screen">
       <span className="select-eligible-label">Select eligible</span>
-      <button className="btn btn-small" disabled={!anyCPU && !anyMemory} onClick={() => selectEligible(true, true)}>
-        CPU + memory
-      </button>
-      <button className="btn btn-small" disabled={!anyMemory} onClick={() => selectEligible(false, true)}>
-        Memory
-      </button>
-      <button className="btn btn-small" disabled={!anyCPU} onClick={() => selectEligible(true, false)}>
-        CPU
-      </button>
+      {selectEligibleOptions.map((option) => {
+        const pressed = pickedEligible === option.value;
+        return (
+          <button
+            key={option.value}
+            className="btn btn-small btn-toggle"
+            aria-pressed={pressed}
+            disabled={option.disabled}
+            onClick={() =>
+              pressed ? deselectEligible(option.cpu, option.memory) : selectEligible(option.cpu, option.memory)
+            }
+          >
+            {pressed && <Check size={14} strokeWidth={2} aria-hidden="true" />}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 
