@@ -98,3 +98,22 @@ export function formatAge(seconds: number): string {
   if (hours < 24) return `${hours}h`
   return `${Math.floor(hours / 24)}d`
 }
+
+/** Rounds a delta percent to one decimal, as every theme displays it. */
+export function roundPercent(percent?: number): number | undefined {
+  return percent === undefined ? undefined : Math.round(percent * 10) / 10
+}
+
+export function formatPercent(rounded: number): string {
+  return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded)}%`
+}
+
+/**
+ * "owner/repo" out of a Git remote URL (SSH or HTTPS), for tables where the
+ * full URL would dominate; falls back to the URL itself.
+ */
+export function shortRepo(url: string | undefined): string {
+  if (!url) return '—'
+  const match = url.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/)
+  return match ? match[1] : url
+}

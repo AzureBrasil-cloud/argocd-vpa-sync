@@ -1,6 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { login } from '../api/client'
+import { getUserInfo, listRecommendations, login } from '../api/client'
+import { Icon } from '../components/Icon'
+import { EntryLoader } from '../components/LoadingScreen'
+import markLive from '../assets/brand-mark.gif'
+import markStill from '../assets/brand-mark.png'
+import { applyTheme, resolveTheme } from '../theme'
 
 /**
  * Where to go after logging in: the ?next= path, but only a same-origin
@@ -21,6 +26,17 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // After a good sign-in the card becomes the entrance loader while the
+  // dashboard's first data loads; `ready` once that request has settled.
+  const [entering, setEntering] = useState(false)
+  const [ready, setReady] = useState(false)
+
+  // The theme comes from the same unauthenticated endpoint the shell uses.
+  useEffect(() => {
+    getUserInfo()
+      .then((info) => applyTheme(resolveTheme(info.theme)))
+      .catch(() => applyTheme(resolveTheme(undefined)))
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -28,7 +44,11 @@ export function Login() {
     setError(null)
     try {
       await login(username, password)
-      navigate(safeNext(params.get('next')), { replace: true })
+      setEntering(true)
+      // Warms the first screen; a failure here is the dashboard's to report.
+      listRecommendations()
+        .catch(() => undefined)
+        .finally(() => setReady(true))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(
@@ -42,24 +62,39 @@ export function Login() {
     }
   }
 
-  return (
-    <div className="login">
-      <form className="panel login-form" onSubmit={handleSubmit}>
-        <div className="app-header-title">
-          <span className="app-logo" aria-hidden="true">◔</span>
-          <h1>argocd-vpa-updater</h1>
-        </div>
-        <label className="login-field">
-          <span>Username</span>
-          <input
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
+  if (entering) {
+    return (
+      <main className="login">
+        <div className="login-form login-entering">
+          <EntryLoader
+            title="Opening argocd-vpa-sync"
+            minDurationMs={2000}
+            finished={ready}
+            onComplete={() => navigate(safeNext(params.get('next')), { replace: true })}
           />
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="login">
+      <form className="login-form" onSubmit={handleSubmit}>
+        <div className="login-brand">
+          {/* The product mark, live here (its still frame under reduced
+              motion): the sign-in screen is where it introduces the product. */}
+          <picture className="login-mark" aria-hidden="true">
+            <source srcSet={markStill} media="(prefers-reduced-motion: reduce)" />
+            <img src={markLive} alt="" width={56} height={56} />
+          </picture>
+          <h1>argocd-vpa-sync</h1>
+        </div>
+        <p className="login-sub">Sign in to review VPA recommendations and queue write-backs to Git.</p>
+        <label className="field">
+          <span>Username</span>
+          <input name="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
         </label>
-        <label className="login-field">
+        <label className="field">
           <span>Password</span>
           <input
             name="password"
@@ -71,11 +106,16 @@ export function Login() {
             required
           />
         </label>
-        {error && <div className="panel panel-error">{error}</div>}
-        <button className="btn btn-primary" type="submit" disabled={submitting}>
+        {error && (
+          <div className="callout callout-error" role="alert">
+            <Icon name="error" />
+            <span>{error}</span>
+          </div>
+        )}
+        <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-    </div>
+    </main>
   )
 }

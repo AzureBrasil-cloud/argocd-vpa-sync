@@ -25,6 +25,8 @@ type Server struct {
 	auth         *auth.Authenticator
 	cookieSecure bool
 	loginLimiter *auth.LoginLimiter
+
+	settings SettingsResponse
 }
 
 // NewServer builds a Server backed by service.
@@ -47,6 +49,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/session", s.handleLogin)
 	s.mux.HandleFunc("DELETE /api/v1/session", s.handleLogout)
 	s.mux.HandleFunc("GET /api/v1/session/userinfo", s.handleUserInfo)
+
+	s.mux.HandleFunc("GET /api/v1/settings", s.handleSettings)
 
 	s.mux.HandleFunc("GET /api/v1/recommendations", s.handleListRecommendations)
 	s.mux.HandleFunc("POST /api/v1/recommendations/bulk-select", s.handleBulkSelectRecommendations)

@@ -4,8 +4,11 @@ import type {
   PendingSelectionDTO,
   RecommendationDTO,
   SelectRequest,
+  SettingsDTO,
   UserInfo,
 } from './types'
+
+import { beginLoad, markLoad } from '../lib/loadProgress'
 
 const SESSION_PATH = '/api/v1/session'
 
@@ -16,7 +19,18 @@ export function redirectToLogin(): void {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  // GETs report their stage to the loading screen (lib/loadProgress).
+  const load = !init?.method || init.method === 'GET' ? beginLoad() : null
+  try {
+    return await send<T>(url, init, load)
+  } finally {
+    if (load !== null) markLoad(load, 'done')
+  }
+}
+
+async function send<T>(url: string, init: RequestInit | undefined, load: number | null): Promise<T> {
   const res = await fetch(url, init)
+  if (load !== null) markLoad(load, 'response')
   if (res.status === 401 && !url.startsWith(SESSION_PATH)) {
     // Session missing or expired (e.g. the admin password changed).
     redirectToLogin()
@@ -81,4 +95,8 @@ export function logout(): Promise<void> {
 
 export function getUserInfo(): Promise<UserInfo> {
   return request<UserInfo>(`${SESSION_PATH}/userinfo`)
+}
+
+export function getSettings(): Promise<SettingsDTO> {
+  return request<SettingsDTO>('/api/v1/settings')
 }

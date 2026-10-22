@@ -125,6 +125,32 @@ type RecommendationDTO struct {
 	// write-back attempt, once one exists (Status has moved past "new" or
 	// "selected"). Nil when nothing has been applied/attempted yet.
 	Operation *OperationDTO `json:"operation,omitempty"`
+
+	// Binding is where write-back commits this container's values: the
+	// VpaGitOpsBinding's repo/branch and this container's manifest and key
+	// paths. Nil when the binding itself failed validation.
+	Binding *BindingDTO `json:"binding,omitempty"`
+}
+
+// BindingDTO is the VpaGitOpsBinding configuration behind one container's
+// write-back (see domain.GitOpsBindingSpec / ContainerWriteBackConfig).
+type BindingDTO struct {
+	ArgoCDApplication          string `json:"argocdApplication,omitempty"`
+	ArgoCDApplicationNamespace string `json:"argocdApplicationNamespace,omitempty"`
+	RepoURL                    string `json:"repoURL,omitempty"`
+	Branch                     string `json:"branch,omitempty"`
+	WriteBackPolicy            string `json:"writeBackPolicy,omitempty"`
+
+	ManifestType       string `json:"manifestType,omitempty"`
+	ManifestPath       string `json:"manifestPath,omitempty"`
+	CPUKeyPath         string `json:"cpuKeyPath,omitempty"`
+	MemoryKeyPath      string `json:"memoryKeyPath,omitempty"`
+	CPULimitKeyPath    string `json:"cpuLimitKeyPath,omitempty"`
+	MemoryLimitKeyPath string `json:"memoryLimitKeyPath,omitempty"`
+
+	// MinChangePercent is the threshold in effect for this container: its
+	// own override, else the binding's, else the default.
+	MinChangePercent float64 `json:"minChangePercent"`
 }
 
 // OperationDTO is the write-back detail surfaced for one recommendation: the

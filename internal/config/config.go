@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -31,7 +32,19 @@ type Config struct {
 	// Auth configures the optional admin account guarding the dashboard and
 	// API.
 	Auth AuthConfig
+
+	// Theme is the dashboard's look, chosen at install time (Helm value
+	// "theme"): one of Themes.
+	Theme string
 }
+
+// Themes are the dashboard themes DASHBOARD_THEME accepts. "default" is the
+// standard admin-console look; the others are alternative visual worlds over
+// the same pages and behavior (see web/src/theme.ts).
+var Themes = []string{"default", "fitting-room", "calibration"}
+
+// DefaultTheme is used when DASHBOARD_THEME is unset.
+const DefaultTheme = "default"
 
 // AuthConfig configures the local admin account (see internal/auth).
 type AuthConfig struct {
@@ -61,6 +74,7 @@ func Default() Config {
 		StateSecretName:       "argocd-vpa-updater-state",
 		ArgoCDNamespace:       "argocd",
 		WriteBackPollInterval: 20 * time.Second,
+		Theme:                 DefaultTheme,
 		Auth: AuthConfig{
 			Username:     "admin",
 			SessionTTL:   24 * time.Hour,
@@ -92,6 +106,13 @@ func FromEnv() (Config, error) {
 			return Config{}, fmt.Errorf("config: WRITEBACK_POLL_INTERVAL_SECONDS must be a positive integer, got %q", v)
 		}
 		cfg.WriteBackPollInterval = time.Duration(seconds) * time.Second
+	}
+
+	if v := os.Getenv("DASHBOARD_THEME"); v != "" {
+		if !slices.Contains(Themes, v) {
+			return Config{}, fmt.Errorf("config: DASHBOARD_THEME must be one of %v, got %q", Themes, v)
+		}
+		cfg.Theme = v
 	}
 
 	if v := os.Getenv("ADMIN_USERNAME"); v != "" {

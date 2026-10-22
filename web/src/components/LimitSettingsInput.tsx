@@ -6,10 +6,10 @@ const HEADROOM_TOOLTIP =
   'Limit headroom is how much room the limit leaves above the request: the new request becomes ' +
   '(100 − N)% of the limit, i.e. limit = request ÷ (1 − N/100), rounded up. ' +
   'E.g. 20% with a 305Mi request gives a 382Mi limit (the request is 80% of it). ' +
-  'Must be ≥ 0 and < 100 -- at 100% the limit would be infinite.'
+  'Must be ≥ 0 and < 100: at 100% the limit would be infinite.'
 
 const ABSOLUTE_TOOLTIP =
-  'The limit is set to exactly this value, whatever the request. It must not be below the new request -- ' +
+  'The limit is set to exactly this value, whatever the request. It must not be below the new request: ' +
   'Kubernetes rejects a request greater than its limit.'
 
 const REQUIRED_TOOLTIP =
@@ -105,7 +105,7 @@ export function LimitSettingsInput({ settings, resources, disabled }: LimitSetti
                 <Hint align="right">{tooltip}</Hint>
                 {!valid && (
                   <span className="limit-settings-error">
-                    {input.mode === 'headroom' ? 'must be ≥ 0 and < 100' : `invalid -- ${LIMIT_VALUE_HINT[resource]}`}
+                    {input.mode === 'headroom' ? 'must be ≥ 0 and < 100' : `invalid: ${LIMIT_VALUE_HINT[resource]}`}
                   </span>
                 )}
               </>
