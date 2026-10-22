@@ -62,6 +62,7 @@
   --bar-h: 0px;
   --gutter: 32px;
   --queue-w: 320px;
+  --page-max: 1720px;
 }
 
 /* Default, dark: a composed palette, not the light one inverted. A deep
@@ -855,7 +856,9 @@ textarea {
   display: flex;
   align-items: stretch;
   gap: 32px;
-  padding: 0 var(--gutter);
+  /* Matches the centered .page's content edges on wide screens, so the
+     brand lines up with the page title. */
+  padding: 0 max(var(--gutter), calc((100% - var(--page-max)) / 2 + var(--gutter)));
 }
 
 :root:not([data-theme='default']) .brand {
@@ -916,7 +919,8 @@ textarea {
 
 .page {
   padding: 24px var(--gutter) 48px;
-  max-width: 1720px;
+  max-width: var(--page-max);
+  margin-inline: auto;
 }
 
 .page-narrow {
@@ -2744,9 +2748,11 @@ td.col-vpa .vpa-meta {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: -24px calc(var(--gutter) * -1) 20px;
-  background: var(--shell-bg);
+  padding-top: 1px;
   color: var(--shell-ink);
-  border-top: 1px solid var(--shell-line);
+  /* Background and top rule bleed to the viewport edges while the cells
+     stay on the centered page; outset is ink overflow, so no scrollbar. */
+  border-image: linear-gradient(var(--shell-line) 1px, var(--shell-bg) 1px) fill 0 // 0 100vmax;
 }
 
 .id-strip > div {
