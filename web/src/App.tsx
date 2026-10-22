@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { getUserInfo, logout, redirectToLogin } from './api/client'
 import type { UserInfo } from './api/types'
 import { AccountButton } from './components/AccountButton'
-import { BrandChip } from './components/BrandChip'
+import { BrandMark } from './components/BrandMark'
 import { ColorModeButton } from './components/ColorModeButton'
 import { Icon, Logo } from './components/Icon'
 import { NAV } from './nav'
@@ -51,7 +51,7 @@ export function App() {
         </a>
         <header className="shell-bar">
           <NavLink to="/" className="brand" end>
-            {theme === 'default' ? <BrandChip /> : <Logo />}
+            {theme === 'default' ? <BrandMark /> : <Logo />}
             <span className="brand-name">argocd-vpa-sync</span>
           </NavLink>
           <nav className="nav" aria-label="Sections">

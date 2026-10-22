@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { RecommendationDTO } from '../api/types'
 import { Icon } from '../components/Icon'
+import { LoadingScreen } from '../components/LoadingScreen'
 import { PageTitle } from '../components/PageTitle'
 import { recommendationPath, rowKey, useRecommendations } from '../lib/useRecommendations'
 
@@ -52,7 +53,7 @@ export function Bindings() {
           <span>Failed to load bindings: {error}</span>
         </div>
       )}
-      {!error && items === null && <p className="loading">Loading bindings…</p>}
+      {!error && items === null && <LoadingScreen title="Loading bindings" />}
       {items && groups.length === 0 && (
         <div className="empty">
           <h2>No bindings yet</h2>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../components/Icon'
+import { LoadingScreen } from '../components/LoadingScreen'
 import { PageTitle } from '../components/PageTitle'
 import { Segmented } from '../components/Segmented'
 import { StatusBadge } from '../components/StatusBadge'
@@ -66,7 +67,7 @@ export function History() {
           <span>Failed to load write-backs: {error}</span>
         </div>
       )}
-      {!error && items === null && <p className="loading">Loading write-backs…</p>}
+      {!error && items === null && <LoadingScreen title="Loading write-backs" />}
 
       {items && (
         <>

@@ -5,6 +5,7 @@ import { selectRecommendation } from "../api/client";
 import type { RecommendationDTO, RecommendationStatus, SelectRequest } from "../api/types";
 import { EligibilityBadge } from "../components/EligibilityBadge";
 import { Icon } from "../components/Icon";
+import { LoadingScreen } from "../components/LoadingScreen";
 import { PageTitle } from "../components/PageTitle";
 import { ResourceCheckbox } from "../components/ResourceCheckbox";
 import { ResourceReading } from "../components/ResourceReading";
@@ -316,7 +317,7 @@ export function RecommendationList() {
         <header className="page-head">
           <PageTitle section="recommendations" />
         </header>
-        <p className="loading">Loading recommendations…</p>
+        <LoadingScreen title="Loading recommendations" />
       </div>
     );
   }

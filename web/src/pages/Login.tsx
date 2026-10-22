@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getUserInfo, login } from '../api/client'
 import { Icon, Logo } from '../components/Icon'
-import { applyTheme, resolveTheme } from '../theme'
+import markLive from '../assets/brand-mark.gif'
+import markStill from '../assets/brand-mark.png'
+import { applyTheme, resolveTheme, type Theme } from '../theme'
 
 /**
  * Where to go after logging in: the ?next= path, but only a same-origin
@@ -23,12 +25,17 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [theme, setTheme] = useState<Theme>(() => resolveTheme(undefined))
 
   // The theme comes from the same unauthenticated endpoint the shell uses.
   useEffect(() => {
+    const show = (next: Theme) => {
+      applyTheme(next)
+      setTheme(next)
+    }
     getUserInfo()
-      .then((info) => applyTheme(resolveTheme(info.theme)))
-      .catch(() => applyTheme(resolveTheme(undefined)))
+      .then((info) => show(resolveTheme(info.theme)))
+      .catch(() => show(resolveTheme(undefined)))
   }, [])
 
   async function handleSubmit(e: FormEvent) {
@@ -55,7 +62,17 @@ export function Login() {
     <main className="login">
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="login-brand">
-          <Logo />
+          {theme === 'default' ? (
+            // The default theme's mark, live here (its still frame under
+            // reduced motion): the sign-in screen is where it introduces
+            // the product.
+            <picture className="login-mark" aria-hidden="true">
+              <source srcSet={markStill} media="(prefers-reduced-motion: reduce)" />
+              <img src={markLive} alt="" width={56} height={56} />
+            </picture>
+          ) : (
+            <Logo />
+          )}
           <h1>argocd-vpa-sync</h1>
         </div>
         <p className="login-sub">Sign in to review VPA recommendations and queue write-backs to Git.</p>

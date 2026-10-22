@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getRecommendation, listRecommendations, selectRecommendation } from '../api/client'
 import type { RecommendationDTO } from '../api/types'
 import { EligibilityBadge } from '../components/EligibilityBadge'
+import { LoadingScreen } from '../components/LoadingScreen'
 import { Hint } from '../components/Hint'
 import { Icon } from '../components/Icon'
 import { ResourceReading } from '../components/ResourceReading'
@@ -263,7 +264,7 @@ export function RecommendationDetail() {
           <span>Failed to load: {error}</span>
         </div>
       )}
-      {!error && !item && <p className="loading">Loading…</p>}
+      {!error && !item && <LoadingScreen title="Loading recommendation" />}
 
       {item && (
         <>
