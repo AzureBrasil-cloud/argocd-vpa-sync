@@ -92,6 +92,27 @@ export interface RecommendationDTO {
   // Operation carries branch/commit/error detail for the most recent
   // write-back attempt, once one exists (status has moved past new/selected).
   operation?: OperationDTO
+
+  // Where write-back commits this container's values. Absent when the
+  // binding itself failed validation.
+  binding?: BindingDTO
+}
+
+// BindingDTO mirrors internal/api/dto.go's BindingDTO.
+export interface BindingDTO {
+  argocdApplication?: string
+  argocdApplicationNamespace?: string
+  repoURL?: string
+  branch?: string
+  writeBackPolicy?: string
+  manifestType?: string
+  manifestPath?: string
+  cpuKeyPath?: string
+  memoryKeyPath?: string
+  cpuLimitKeyPath?: string
+  memoryLimitKeyPath?: string
+  /** The threshold in effect for this container. */
+  minChangePercent: number
 }
 
 // OperationDTO mirrors internal/api/dto.go's OperationDTO.
@@ -141,7 +162,6 @@ export interface LimitSpecRequest {
   value?: string
 }
 
-
 export interface LoginResponse {
   token: string
   expiresAt: string
@@ -150,6 +170,23 @@ export interface LoginResponse {
 export interface UserInfo {
   loggedIn: boolean
   username?: string
-  /** False when the server runs with AUTH_ENABLED=false. */
+  /** False when no admin password is configured. */
   authEnabled: boolean
+  /** The dashboard theme (Helm value "theme"); see src/theme.ts. */
+  theme?: string
+}
+
+// Mirrors api.SettingsResponse -- the body of GET /api/v1/settings.
+export interface SettingsDTO {
+  theme: string
+  version: string
+  gitCommit: string
+  buildDate: string
+  authEnabled: boolean
+  username?: string
+  sessionTtlSeconds?: number
+  argocdNamespace: string
+  stateSecretNamespace: string
+  stateSecretName: string
+  writeBackPollIntervalSeconds: number
 }

@@ -45,10 +45,10 @@ is large enough to be worth applying.
 
 **Apply several at once, with safety margins.** Select the containers to
 change, optionally add headroom above the VPA's number, and choose how
-limits follow the new requests. The summary shows exactly what will be
-written, and warns when a limit would go down.
+limits follow the new requests. The write-back queue beside the table shows
+exactly what will be written, and warns when a limit would go down.
 
-![Selection summary with request headroom and limit settings](docs/images/selection-summary.png)
+![Write-back queue with request headroom and limit settings](docs/images/selection-summary.png)
 
 **The full picture for each container**: the current value, the VPA's
 target and its lower/upper bounds, the resulting request and limit, and the
@@ -56,10 +56,19 @@ status of the last write-back.
 
 ![Recommendation detail](docs/images/recommendation-detail.png)
 
-<details>
-<summary>Cards view, and the optional login</summary>
+**Write-back history, bindings and settings.** See the latest write-back
+of each container with its commit or error, every `VpaGitOpsBinding` with
+the manifest and key paths it writes, and the deployment's settings.
 
-![Cards view](docs/images/dashboard-cards.png)
+**Three themes**, chosen at install time: the standard console look, or two
+alternatives (see [Themes](#themes)).
+
+<details>
+<summary>The other themes, and the optional login</summary>
+
+![The Fitting Room theme](docs/images/theme-fitting-room.png)
+
+![The Calibration Certificate theme](docs/images/theme-calibration.png)
 
 ![Login](docs/images/login.png)
 
@@ -214,6 +223,29 @@ characters).
 - The pod reads the Secret at startup. Run `kubectl rollout restart` after
   rotating an `existingSecret`.
 
+## Themes
+
+The dashboard ships with three themes. Every theme has the same pages,
+data and actions; only the look changes. Pick one with the Helm value
+`theme` (the default is `default`):
+
+| `theme` | Look |
+|---|---|
+| `default` | The standard admin console: left sidebar, blue accent, deltas as colored badges. |
+| `fitting-room` | Charcoal navbar and tape-yellow accent, square hairline tables. Each CPU/memory cell is a tape-measure gauge: the VPA's range as a band, the current request as a tick, and an arrow to the recommendation (hatched when it isn't eligible). The write-back queue is drawn as a ticket. |
+| `calibration` | Ink header band with a summary strip (cluster, bindings, eligible, failed write-backs, last commit). Each CPU/memory cell is a tolerance bar with an IN/OUT verdict (OUT: the current request is outside the VPA's range), and the queue previews the values diff each change will commit. |
+
+```sh
+helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
+  --namespace argocd --reuse-values \
+  --set theme=fitting-room
+```
+
+The theme is also served before login, so the login page matches. An
+unknown name is rejected by the chart's schema, and by the binary at
+startup. The **Settings** page lists the themes and shows which one is in
+use.
+
 ## Configuration
 
 The most common values are below. See
@@ -227,6 +259,7 @@ The most common values are below. See
 | `ssh.knownHostsConfigMap` | `argocd-ssh-known-hosts-cm` | SSH host keys to trust (a ConfigMap in the release namespace) |
 | `ssh.extraKnownHosts` | `""` | Host keys to trust instead, in `ssh_known_hosts` format |
 | `writeback.pollIntervalSeconds` | `20` | How often queued selections are committed |
+| `theme` | `default` | Dashboard theme: `default`, `fitting-room` or `calibration` (see [Themes](#themes)) |
 | `auth.admin.passwordHash` | `""` | bcrypt/argon2id hash of the admin password. Setting it turns the login on |
 | `auth.admin.username` | `admin` | Admin username |
 | `auth.existingSecret` | `""` | Secret with `admin.password` (and optionally `server.secretkey`), instead of the two values above |
@@ -436,6 +469,9 @@ KUBECONFIG=... ./argocd-vpa-updater
 cd web && npm install && npm run dev    # dashboard, proxies /api to :8080
 ```
 
+In `npm run dev`, add `?theme=fitting-room` (or `calibration`, `default`)
+to any URL to preview a theme without restarting the binary.
+
 When run directly, the binary reads these environment variables:
 
 - `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `SESSION_SIGNING_KEY`,
@@ -443,6 +479,7 @@ When run directly, the binary reads these environment variables:
   chart.
 - `ARGOCD_NAMESPACE`, `STATE_SECRET_NAMESPACE`, `STATE_SECRET_NAME`,
   `WRITEBACK_POLL_INTERVAL_SECONDS`, `SSH_KNOWN_HOSTS`, `LISTEN_ADDR`.
+- `DASHBOARD_THEME`: the same setting as `theme` in the chart.
 
 ### Testing
 

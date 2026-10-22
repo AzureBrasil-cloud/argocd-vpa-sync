@@ -106,7 +106,18 @@ func run(logger *slog.Logger) error {
 		WorkloadReader: workloadresources.NewClusterReader(mgr.GetClient()),
 		State:          statestore.NewSecretStore(mgr.GetClient(), cfg.StateSecretNamespace, cfg.StateSecretName),
 	}
-	var serverOpts []api.Option
+	serverOpts := []api.Option{api.WithSettings(api.SettingsResponse{
+		Theme:                        cfg.Theme,
+		Version:                      version.Version,
+		GitCommit:                    version.GitCommit,
+		BuildDate:                    version.BuildDate,
+		Username:                     cfg.Auth.Username,
+		SessionTTLSeconds:            int64(cfg.Auth.SessionTTL.Seconds()),
+		ArgoCDNamespace:              cfg.ArgoCDNamespace,
+		StateSecretNamespace:         cfg.StateSecretNamespace,
+		StateSecretName:              cfg.StateSecretName,
+		WriteBackPollIntervalSeconds: int64(cfg.WriteBackPollInterval.Seconds()),
+	})}
 	if cfg.Auth.Enabled() {
 		signingKey := []byte(cfg.Auth.SigningKey)
 		if len(signingKey) == 0 {

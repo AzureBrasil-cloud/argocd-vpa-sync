@@ -53,6 +53,9 @@ type UserInfoResponse struct {
 	LoggedIn    bool   `json:"loggedIn"`
 	Username    string `json:"username,omitempty"`
 	AuthEnabled bool   `json:"authEnabled"`
+	// Theme is the dashboard theme (see WithSettings), served here because
+	// this endpoint needs no session: the login page is themed too.
+	Theme string `json:"theme"`
 }
 
 // requiresSession reports whether r must carry a valid session.
@@ -149,11 +152,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 // handleUserInfo serves GET /api/v1/session/userinfo.
 func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
-		writeJSON(w, http.StatusOK, UserInfoResponse{LoggedIn: true, AuthEnabled: false})
+		writeJSON(w, http.StatusOK, UserInfoResponse{LoggedIn: true, AuthEnabled: false, Theme: s.theme()})
 		return
 	}
 	claims, ok := s.authenticated(r)
-	writeJSON(w, http.StatusOK, UserInfoResponse{LoggedIn: ok, Username: claims.Subject, AuthEnabled: true})
+	writeJSON(w, http.StatusOK, UserInfoResponse{LoggedIn: ok, Username: claims.Subject, AuthEnabled: true, Theme: s.theme()})
 }
 
 // clientIP identifies the caller for login throttling. It deliberately uses
