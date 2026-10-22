@@ -51,7 +51,7 @@ export function App() {
         </a>
         <header className="shell-bar">
           <NavLink to="/" className="brand" end>
-            {theme === 'default' ? <BrandMark /> : <Logo />}
+            {theme === 'calibration' ? <Logo /> : <BrandMark />}
             <span className="brand-name">argocd-vpa-sync</span>
           </NavLink>
           <nav className="nav" aria-label="Sections">
@@ -77,7 +77,7 @@ export function App() {
           )}
           {user.authEnabled && theme !== 'default' && (
             <div className="session">
-              <span className="session-user">{user.username}</span>
+              {theme !== 'fitting-room' && <span className="session-user">{user.username}</span>}
               <button className="btn btn-small btn-shell" onClick={handleLogout} aria-label="Sign out">
                 <Icon name="sign-out" />
                 <span className="btn-label">Sign out</span>

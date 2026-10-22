@@ -445,9 +445,16 @@ textarea {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .shell-bar:is(:hover, :has(:focus-visible)) .brand-mark-live {
+  :root[data-theme='default'] .shell-bar:is(:hover, :has(:focus-visible)) .brand-mark-live,
+  :root[data-theme='fitting-room'] .brand:is(:hover, :focus-visible) .brand-mark-live {
     display: block;
   }
+}
+
+/* fitting-room: the navbar is charcoal, so the mark is drawn light there,
+   the same treatment as default's dark mode. */
+:root[data-theme='fitting-room'] .shell-bar .brand-mark img {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 :root[data-theme='default'] .nav {

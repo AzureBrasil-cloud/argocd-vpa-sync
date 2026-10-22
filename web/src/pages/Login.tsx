@@ -86,8 +86,8 @@ export function Login() {
     <main className="login">
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="login-brand">
-          {theme === 'default' ? (
-            // The default theme's mark, live here (its still frame under
+          {theme !== 'calibration' ? (
+            // The flow mark (default and fitting-room), live here (its still frame under
             // reduced motion): the sign-in screen is where it introduces
             // the product.
             <picture className="login-mark" aria-hidden="true">
