@@ -60,15 +60,16 @@ status of the last write-back.
 of each container with its commit or error, every `VpaGitOpsBinding` with
 the manifest and key paths it writes, and the deployment's settings.
 
-**Three themes**, chosen at install time: the standard console look, or two
-alternatives (see [Themes](#themes)).
+**Three themes**, chosen at install time with a single Helm value: the
+standard console look, or two alternatives that draw each recommendation as
+a gauge (see [Themes](#themes)).
+
+| `default` | `fitting-room` | `calibration` |
+|:---:|:---:|:---:|
+| [![Default theme](docs/images/dashboard-list.png)](#default) | [![Fitting Room theme](docs/images/theme-fitting-room.png)](#fitting-room) | [![Calibration theme](docs/images/theme-calibration.png)](#calibration) |
 
 <details>
-<summary>The other themes, and the optional login</summary>
-
-![The Fitting Room theme](docs/images/theme-fitting-room.png)
-
-![The Calibration Certificate theme](docs/images/theme-calibration.png)
+<summary>The optional login</summary>
 
 ![Login](docs/images/login.png)
 
@@ -129,7 +130,7 @@ Argo CD's namespace:
 
 ```sh
 helm install argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
-  --version 0.1.0 --namespace argocd
+  --version 0.2.0 --namespace argocd
 ```
 
 Then opt a VPA in. The VPA must use `updateMode: "Off"`. The binding lives in
@@ -227,19 +228,68 @@ characters).
 
 The dashboard ships with three themes. Every theme has the same pages,
 data and actions; only the look changes. Pick one with the Helm value
-`theme` (the default is `default`):
+`theme` (the default is `default`).
 
-| `theme` | Look |
-|---|---|
-| `default` | The standard admin console: left sidebar, blue accent, deltas as colored badges. |
-| `fitting-room` | Charcoal navbar and tape-yellow accent, square hairline tables. Each CPU/memory cell is a tape-measure gauge: the VPA's range as a band, the current request as a tick, and an arrow to the recommendation (hatched when it isn't eligible). The write-back queue is drawn as a ticket. |
-| `calibration` | Ink header band with a summary strip (cluster, bindings, eligible, failed write-backs, last commit). Each CPU/memory cell is a tolerance bar with an IN/OUT verdict (OUT: the current request is outside the VPA's range), and the queue previews the values diff each change will commit. |
+### `default`
+
+The standard admin console: left sidebar, blue accent, and each
+recommendation shown as a colored delta badge next to the new value.
+
+![The default theme](docs/images/dashboard-list.png)
+
+### `fitting-room`
+
+Charcoal navbar, tape-yellow accent and square hairline tables. Each
+CPU/memory cell is a tape-measure gauge: the VPA's range as a band, the
+current request as a tick, and an arrow to the recommendation (hatched when
+it isn't eligible). The write-back queue is drawn as a ticket.
+
+![The Fitting Room theme](docs/images/theme-fitting-room.png)
+
+### `calibration`
+
+An ink header band with a summary strip (cluster, bindings, eligible,
+failed write-backs, last commit). Each CPU/memory cell is a tolerance bar
+with an IN/OUT verdict (OUT: the current request is outside the VPA's
+range), and the queue previews the values diff each change will commit.
+
+![The Calibration theme](docs/images/theme-calibration.png)
+
+### Choosing a theme
+
+With `helm upgrade`:
 
 ```sh
 helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
   --namespace argocd --reuse-values \
   --set theme=fitting-room
 ```
+
+In a values file:
+
+```yaml
+# values.yaml
+theme: calibration   # default | fitting-room | calibration
+```
+
+Or, if Argo CD itself deploys the chart, in the Application:
+
+```yaml
+spec:
+  source:
+    repoURL: registry-1.docker.io/azurebrasil
+    chart: argocd-vpa-sync
+    targetRevision: 0.2.0
+    helm:
+      valuesObject:
+        theme: fitting-room
+```
+
+The chart passes the value to the pod as the `DASHBOARD_THEME` environment
+variable, so changing it rolls a new pod that serves the new theme right
+away. When running the binary directly, set `DASHBOARD_THEME` yourself; in
+`npm run dev`, add `?theme=<name>` to any URL to preview a theme without a
+restart (see [Running locally](#running-locally)).
 
 The theme is also served before login, so the login page matches. An
 unknown name is rejected by the chart's schema, and by the binary at
