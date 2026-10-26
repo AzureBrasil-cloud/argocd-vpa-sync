@@ -44,7 +44,7 @@ is large enough to be worth applying.
 ![Dashboard: recommendations compared with the live workloads](docs/images/dashboard-list.png)
 
 **Apply several at once, with safety margins.** Select the containers to
-change, optionally add headroom above the VPA's number, and choose how
+change, keep a headroom above the VPA's number (30% by default), and choose how
 limits follow the new requests. The write-back queue beside the table shows
 exactly what will be written, and warns when a limit would go down.
 
@@ -120,8 +120,9 @@ Many workloads also scale horizontally, and that is exactly where badly
 sized requests hurt the most: an HPA's utilization is measured against the
 request, so a wrong request makes it scale at the wrong time. This tool
 exists to correct those requests. Every change is reviewed by a person
-before it reaches Git, and the request headroom setting keeps a margin
-above the VPA's number before a utilization-based HPA scales out.
+before it reaches Git, and the request headroom, on at 30% unless you turn
+it off, writes the request so the VPA's number is 70% of it, leaving a margin
+before a utilization-based HPA scales out.
 
 ## Getting started
 

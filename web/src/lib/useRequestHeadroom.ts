@@ -32,14 +32,16 @@ export interface RequestHeadroomSettings {
   parsed: Record<LimitResource, number | null>
 }
 
+// On until the viewer turns it off: written bare, a recommendation leaves no
+// margin for a utilization-based HPA (see DEFAULT_REQUEST_HEADROOM_PERCENT).
 function readEnabled(): Record<LimitResource, boolean> {
   try {
     const stored = JSON.parse(localStorage.getItem(ENABLED_STORAGE_KEY) ?? 'null') as Partial<
       Record<LimitResource, boolean>
     > | null
-    return { cpu: stored?.cpu === true, memory: stored?.memory === true }
+    return { cpu: stored?.cpu !== false, memory: stored?.memory !== false }
   } catch {
-    return { cpu: false, memory: false }
+    return { cpu: true, memory: true }
   }
 }
 
@@ -64,8 +66,8 @@ function readStored(): RequestHeadroomInputs {
 /**
  * Per-resource, optional request headroom: how far above the VPA
  * recommendation the request is written (the recommendation becomes
- * (100 - N)% of it). Off by default; the on/off choice and valid values are
- * remembered per browser, like the limit settings.
+ * (100 - N)% of it). On at 30% by default; the on/off choice and valid
+ * values are remembered per browser, like the limit settings.
  */
 export function useRequestHeadroom(): RequestHeadroomSettings {
   const [inputs, setInputs] = useState<RequestHeadroomInputs>(readStored)
