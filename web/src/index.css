@@ -2717,6 +2717,13 @@ td.col-vpa .vpa-meta {
   margin-bottom: 16px;
 }
 
+/* A link out of a callout, e.g. to the binding behind an error. */
+.callout-action {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+}
+
 /* ------------------------------------------------------------------ hint */
 
 .hint {
@@ -2952,6 +2959,16 @@ td.col-vpa .vpa-meta {
 
 .binding {
   margin-bottom: 28px;
+  scroll-margin-top: 72px;
+}
+
+/* The binding a recommendation linked to (bindingPath). */
+.binding.is-target {
+  padding: 12px;
+  margin-inline: -12px;
+  border-radius: var(--radius);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .binding-head {

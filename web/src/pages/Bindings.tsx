@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import type { RecommendationDTO } from '../api/types'
 import { Icon } from '../components/Icon'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { PageTitle } from '../components/PageTitle'
-import { recommendationPath, rowKey, useRecommendations } from '../lib/useRecommendations'
+import { bindingAnchor, recommendationPath, rowKey, useRecommendations } from '../lib/useRecommendations'
 
 interface BindingGroup {
   namespace: string
@@ -37,6 +37,14 @@ export function Bindings() {
     return [...byVPA.values()].sort((a, b) => `${a.namespace}/${a.vpaName}`.localeCompare(`${b.namespace}/${b.vpaName}`))
   }, [items])
 
+  // Linked from a recommendation (bindingPath): the binding to scroll to,
+  // once the list has rendered it.
+  const { hash } = useLocation()
+  const target = hash ? decodeURIComponent(hash.slice(1)) : ''
+  useEffect(() => {
+    if (target && groups.length > 0) document.getElementById(target)?.scrollIntoView({ block: 'start' })
+  }, [target, groups.length])
+
   return (
     <div className="page">
       <header className="page-head">
@@ -66,10 +74,16 @@ export function Bindings() {
       {groups.map(({ namespace, vpaName, first, containers }) => {
         const b = first.binding
         const invalid = first.validationErrors && first.validationErrors.length > 0
+        const anchor = bindingAnchor(first)
         return (
-          <section className="binding" key={`${namespace}/${vpaName}`} aria-labelledby={`binding-${namespace}-${vpaName}`}>
+          <section
+            className={anchor === target ? 'binding is-target' : 'binding'}
+            key={`${namespace}/${vpaName}`}
+            id={anchor}
+            aria-labelledby={`${anchor}-title`}
+          >
             <header className="binding-head">
-              <h2 id={`binding-${namespace}-${vpaName}`}>
+              <h2 id={`${anchor}-title`}>
                 <span className="vpa-ns">{namespace} /</span> {vpaName}
               </h2>
               <dl className="facts">

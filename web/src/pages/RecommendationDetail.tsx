@@ -17,7 +17,7 @@ import { FORMAT, LIMIT_KEY_PATH, type LimitChange, type LimitResource } from '..
 import { planResource, planSelection, type ResourcePlan } from '../lib/selectionPlan'
 import { useLimitSettings } from '../lib/useLimitSettings'
 import { useRequestHeadroom } from '../lib/useRequestHeadroom'
-import { recommendationPath, rowKey } from '../lib/useRecommendations'
+import { bindingPath, recommendationPath, rowKey } from '../lib/useRecommendations'
 
 const RESOURCES: LimitResource[] = ['cpu', 'memory']
 
@@ -296,6 +296,9 @@ export function RecommendationDetail() {
               <span>
                 <strong>Write-back failed:</strong> {item.operation.errorMessage}
               </span>
+              <Link className="btn btn-small callout-action" to={bindingPath(item)}>
+                View binding
+              </Link>
             </div>
           )}
 
@@ -316,6 +319,9 @@ export function RecommendationDetail() {
                 ))}
               </ul>
               </div>
+              <Link className="btn btn-small callout-action" to={bindingPath(item)}>
+                View binding
+              </Link>
             </div>
           )}
 

@@ -54,3 +54,13 @@ export function rowKey(item: Pick<RecommendationDTO, 'namespace' | 'vpaName' | '
 export function recommendationPath(item: Pick<RecommendationDTO, 'namespace' | 'vpaName' | 'containerName'>): string {
   return `/recommendations/${encodeURIComponent(item.namespace)}/${encodeURIComponent(item.vpaName)}/${encodeURIComponent(item.containerName)}`
 }
+
+/** The element id of a VPA's binding on the Bindings page. */
+export function bindingAnchor(item: Pick<RecommendationDTO, 'namespace' | 'vpaName'>): string {
+  return `binding-${item.namespace}-${item.vpaName}`
+}
+
+/** The Bindings page, scrolled to (and highlighting) this VPA's binding. */
+export function bindingPath(item: Pick<RecommendationDTO, 'namespace' | 'vpaName'>): string {
+  return `/bindings#${encodeURIComponent(bindingAnchor(item))}`
+}
