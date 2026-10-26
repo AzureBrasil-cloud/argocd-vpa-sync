@@ -140,11 +140,7 @@ export function History() {
                           <span className="cell-sub">{op?.branch ?? item.binding?.branch ?? ''}</span>
                         </td>
                         <td>
-                          {op?.prUrl ? (
-                            <a href={op.prUrl} target="_blank" rel="noreferrer" className="ext-link">
-                              Pull request <Icon name="external" />
-                            </a>
-                          ) : op?.commitSha ? (
+                          {op?.commitSha ? (
                             url ? (
                               <a href={url} target="_blank" rel="noreferrer" className="ext-link">
                                 <code className="sha">{op.commitSha.slice(0, 7)}</code> <Icon name="external" />
