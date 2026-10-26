@@ -188,6 +188,23 @@ the dashboard, including the actions that queue Git commits. Keep it that
 way only behind a private network, `kubectl port-forward`, or an
 authenticating proxy.
 
+With `ingress.enabled` and no password configured, the login turns on by
+itself: like Argo CD's `argocd-initial-admin-secret`, the pod generates a
+random password on its first start and keeps it in the Secret
+`<fullname>-initial-admin-secret` (`argocd-vpa-sync-initial-admin-secret`
+for a release named `argocd-vpa-sync`). Log in as `admin` with:
+
+```sh
+kubectl -n argocd get secret argocd-vpa-sync-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+```
+
+Later starts reuse it, so it survives restarts and Argo CD syncs. You can
+remove the `password` key once you've saved it (the pod only needs the
+hash). Delete the whole Secret and restart the pod to generate a new one.
+Helm doesn't manage it, so `helm uninstall` leaves it behind. If an
+authenticating proxy already guards the Ingress, set
+`auth.allowOpenIngress=true` to keep it open instead.
+
 To require a login, set an admin password. As with Argo CD's `admin` user,
 the password is only ever stored as a **bcrypt** or **argon2id** hash:
 
@@ -317,6 +334,7 @@ The most common values are below. See
 | `auth.sessionSigningKey` | `""` | Session signing key (at least 32 characters). Random per pod start when empty |
 | `auth.sessionTTL` | `24h` | Session lifetime |
 | `auth.cookieSecure` | `true` | Only send the session cookie over HTTPS |
+| `auth.allowOpenIngress` | `false` | Expose the Ingress without a login instead of generating a password (only behind an authenticating proxy) |
 | `ingress.enabled` | `false` | Expose the dashboard through an Ingress |
 | `networkPolicy.enabled` | `false` | Only allow traffic to the HTTP port from `networkPolicy.from` |
 

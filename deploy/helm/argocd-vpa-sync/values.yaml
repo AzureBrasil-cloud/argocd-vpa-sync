@@ -52,10 +52,13 @@ writeback:
 #                   verdict, and the queue previews the values diff.
 theme: fitting-room
 
-# Optional admin login, in the style of Argo CD's admin user. With neither
+# Admin login, in the style of Argo CD's admin user. With neither
 # auth.admin.passwordHash nor auth.existingSecret set there is no login: the
 # dashboard -- including the actions that queue Git commits -- is open to
-# anyone who can reach the Service.
+# anyone who can reach the Service. Except with ingress.enabled: then the pod
+# generates a random password on first start and keeps it in the Secret
+# <fullname>-initial-admin-secret (key "password"), like Argo CD's
+# argocd-initial-admin-secret.
 auth:
   admin:
     username: admin
@@ -78,6 +81,10 @@ auth:
   # (plain-HTTP http://localhost port-forwards are the exception), so turn
   # it off only when serving the dashboard over plain HTTP on another host.
   cookieSecure: true
+  # Expose the Ingress without a login instead of generating a password.
+  # Only for an Ingress already guarded by an authenticating proxy (e.g.
+  # oauth2-proxy through ingress.annotations).
+  allowOpenIngress: false
 
 serviceAccount:
   create: true

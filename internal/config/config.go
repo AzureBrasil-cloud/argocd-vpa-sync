@@ -59,11 +59,15 @@ type AuthConfig struct {
 	// CookieSecure sets the Secure flag on the session cookie. Only turn it
 	// off when the dashboard is served over plain HTTP (e.g. port-forward).
 	CookieSecure bool
+	// InitialAdminSecretName, when set and no PasswordHash is configured,
+	// names a Secret (in StateSecretNamespace) the pod creates with a
+	// random admin password on first start (see internal/initialadmin).
+	InitialAdminSecretName string
 }
 
 // Enabled reports whether a login is required, i.e. whether an admin
-// password is configured.
-func (c AuthConfig) Enabled() bool { return c.PasswordHash != "" }
+// password is configured or will be generated.
+func (c AuthConfig) Enabled() bool { return c.PasswordHash != "" || c.InitialAdminSecretName != "" }
 
 // Default returns a Config with the same defaults documented in
 // the Helm chart's deployment.yaml env vars.
@@ -120,6 +124,7 @@ func FromEnv() (Config, error) {
 	}
 	cfg.Auth.PasswordHash = os.Getenv("ADMIN_PASSWORD_HASH")
 	cfg.Auth.SigningKey = os.Getenv("SESSION_SIGNING_KEY")
+	cfg.Auth.InitialAdminSecretName = os.Getenv("INITIAL_ADMIN_SECRET_NAME")
 	if v := os.Getenv("SESSION_TTL"); v != "" {
 		ttl, err := time.ParseDuration(v)
 		if err != nil || ttl <= 0 {

@@ -31,6 +31,7 @@ import (
 	"github.com/azurebrasil/argocd-vpa-updater/internal/credentials"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/gitexec"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/gitwriteback"
+	"github.com/azurebrasil/argocd-vpa-updater/internal/initialadmin"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/patcher"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/resolver"
 	"github.com/azurebrasil/argocd-vpa-updater/internal/statestore"
@@ -67,7 +68,8 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("register VpaGitOpsBinding scheme: %w", err)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	restConfig := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
 		// Disabled: controller-runtime's default metrics bind address
 		// (:8080) would otherwise collide with our own API server, which
@@ -118,6 +120,25 @@ func run(logger *slog.Logger) error {
 		StateSecretName:              cfg.StateSecretName,
 		WriteBackPollIntervalSeconds: int64(cfg.WriteBackPollInterval.Seconds()),
 	})}
+	if cfg.Auth.PasswordHash == "" && cfg.Auth.InitialAdminSecretName != "" {
+		// The manager (and its client) isn't started yet: read and create
+		// the Secret through a plain, uncached client.
+		c, err := client.New(restConfig, client.Options{Scheme: scheme})
+		if err != nil {
+			return fmt.Errorf("create kubernetes client: %w", err)
+		}
+		creds, created, err := initialadmin.Ensure(context.Background(), c, cfg.StateSecretNamespace, cfg.Auth.InitialAdminSecretName)
+		if err != nil {
+			return fmt.Errorf("initial admin password: %w", err)
+		}
+		cfg.Auth.PasswordHash = creds.PasswordHash
+		if cfg.Auth.SigningKey == "" {
+			cfg.Auth.SigningKey = creds.SigningKey
+		}
+		if created {
+			logger.Info("generated the initial admin password", "secret", cfg.StateSecretNamespace+"/"+cfg.Auth.InitialAdminSecretName)
+		}
+	}
 	if cfg.Auth.Enabled() {
 		signingKey := []byte(cfg.Auth.SigningKey)
 		if len(signingKey) == 0 {

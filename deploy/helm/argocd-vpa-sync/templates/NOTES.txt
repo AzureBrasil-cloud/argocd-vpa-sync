@@ -9,7 +9,14 @@ Open the dashboard:
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "argocd-vpa-sync.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   http://localhost:{{ .Values.service.port }}
 {{- end }}
-{{ if not (include "argocd-vpa-sync.authEnabled" .) }}
+{{ if include "argocd-vpa-sync.initialAdmin" . }}
+The dashboard is exposed through an Ingress, so it requires a login. Log in
+as "{{ .Values.auth.admin.username }}" with the password the pod generated on its first start:
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "argocd-vpa-sync.initialAdminSecretName" . }} -o jsonpath='{.data.password}' | base64 -d
+
+Set auth.admin.passwordHash (or auth.existingSecret) to choose your own.
+{{- else if not (include "argocd-vpa-sync.authEnabled" .) }}
 There is no login: anyone who can reach the Service can use the dashboard,
 including the actions that queue Git commits. Set auth.admin.passwordHash
 (or auth.existingSecret) to require one.

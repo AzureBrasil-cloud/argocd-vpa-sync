@@ -86,6 +86,19 @@ spec:
               value: {{ .Values.auth.sessionTTL | quote }}
             - name: COOKIE_SECURE
               value: {{ .Values.auth.cookieSecure | quote }}
+            {{- else if include "argocd-vpa-sync.initialAdmin" . }}
+            - name: ADMIN_USERNAME
+              value: {{ .Values.auth.admin.username | quote }}
+            - name: INITIAL_ADMIN_SECRET_NAME
+              value: {{ include "argocd-vpa-sync.initialAdminSecretName" . | quote }}
+            {{- with .Values.auth.sessionSigningKey }}
+            - name: SESSION_SIGNING_KEY
+              value: {{ . | quote }}
+            {{- end }}
+            - name: SESSION_TTL
+              value: {{ .Values.auth.sessionTTL | quote }}
+            - name: COOKIE_SECURE
+              value: {{ .Values.auth.cookieSecure | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

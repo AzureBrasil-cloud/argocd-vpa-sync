@@ -1,6 +1,8 @@
 {{- /*
 Read/write access to exactly one Secret, the operational state document
-(see internal/statestore), which the controller creates on first use.
+(see internal/statestore), which the controller creates on first use --
+plus read access to the generated admin password Secret, when the chart
+asks the pod to create one (see internal/initialadmin).
 Kubernetes RBAC cannot scope "create" by name, so that verb is granted on
 Secrets in the release namespace; it does not allow reading any of them.
 */ -}}
@@ -16,6 +18,12 @@ rules:
     resources: ["secrets"]
     resourceNames: [{{ include "argocd-vpa-sync.stateSecretName" . | quote }}]
     verbs: ["get", "update"]
+  {{- if include "argocd-vpa-sync.initialAdmin" . }}
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ include "argocd-vpa-sync.initialAdminSecretName" . | quote }}]
+    verbs: ["get"]
+  {{- end }}
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["create"]
