@@ -44,7 +44,7 @@ type Config struct {
 var Themes = []string{"default", "fitting-room", "calibration"}
 
 // DefaultTheme is used when DASHBOARD_THEME is unset.
-const DefaultTheme = "default"
+const DefaultTheme = "fitting-room"
 
 // AuthConfig configures the local admin account (see internal/auth).
 type AuthConfig struct {

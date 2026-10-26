@@ -72,7 +72,7 @@ export function Settings() {
             </ul>
             <pre className="snippet">
               <code>{`helm upgrade argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \\
-      -n argocd --reuse-values --set theme=fitting-room`}</code>
+      -n argocd --reuse-values --set theme=calibration`}</code>
             </pre>
           </section>
 

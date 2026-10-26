@@ -12,6 +12,10 @@ export const THEMES = ['default', 'fitting-room', 'calibration'] as const
 
 export type Theme = (typeof THEMES)[number]
 
+// Used when the server sends no (or an unknown) theme. Keep in sync with
+// config.DefaultTheme.
+export const DEFAULT_THEME: Theme = 'fitting-room'
+
 export const THEME_LABELS: Record<Theme, string> = {
   default: 'Default',
   'fitting-room': 'The Fitting Room',
@@ -32,14 +36,14 @@ export function resolveTheme(serverTheme: unknown): Theme {
     const override = new URLSearchParams(window.location.search).get('theme')
     if (isTheme(override)) return override
   }
-  return isTheme(serverTheme) ? serverTheme : 'default'
+  return isTheme(serverTheme) ? serverTheme : DEFAULT_THEME
 }
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme
 }
 
-export const ThemeContext = createContext<Theme>('default')
+export const ThemeContext = createContext<Theme>(DEFAULT_THEME)
 
 export function useTheme(): Theme {
   return useContext(ThemeContext)

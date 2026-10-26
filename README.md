@@ -60,13 +60,13 @@ status of the last write-back.
 of each container with its commit or error, every `VpaGitOpsBinding` with
 the manifest and key paths it writes, and the deployment's settings.
 
-**Three themes**, chosen at install time with a single Helm value: the
-standard console look, or two alternatives that draw each recommendation as
-a gauge (see [Themes](#themes)).
+**Three themes**, chosen at install time with a single Helm value:
+`fitting-room` (the default) and `calibration` draw each recommendation as a
+gauge, and `default` is the standard console look (see [Themes](#themes)).
 
-| `default` | `fitting-room` | `calibration` |
+| `fitting-room` (default) | `calibration` | `default` |
 |:---:|:---:|:---:|
-| [![Default theme](docs/images/dashboard-list.png)](#default) | [![Fitting Room theme](docs/images/theme-fitting-room.png)](#fitting-room) | [![Calibration theme](docs/images/theme-calibration.png)](#calibration) |
+| [![Fitting Room theme](docs/images/theme-fitting-room.png)](#fitting-room-default) | [![Calibration theme](docs/images/theme-calibration.png)](#calibration) | [![Console theme](docs/images/dashboard-list.png)](#default) |
 
 <details>
 <summary>The optional login</summary>
@@ -228,16 +228,9 @@ characters).
 
 The dashboard ships with three themes. Every theme has the same pages,
 data and actions; only the look changes. Pick one with the Helm value
-`theme` (the default is `default`).
+`theme` (the default is `fitting-room`).
 
-### `default`
-
-The standard admin console: left sidebar, blue accent, and each
-recommendation shown as a colored delta badge next to the new value.
-
-![The default theme](docs/images/dashboard-list.png)
-
-### `fitting-room`
+### `fitting-room` (default)
 
 Charcoal navbar, tape-yellow accent and square hairline tables. Each
 CPU/memory cell is a tape-measure gauge: the VPA's range as a band, the
@@ -245,6 +238,13 @@ current request as a tick, and an arrow to the recommendation (hatched when
 it isn't eligible). The write-back queue is drawn as a ticket.
 
 ![The Fitting Room theme](docs/images/theme-fitting-room.png)
+
+### `default`
+
+The standard admin console: left sidebar, blue accent, and each
+recommendation shown as a colored delta badge next to the new value.
+
+![The console theme](docs/images/dashboard-list.png)
 
 ### `calibration`
 
@@ -309,7 +309,7 @@ The most common values are below. See
 | `ssh.knownHostsConfigMap` | `argocd-ssh-known-hosts-cm` | SSH host keys to trust (a ConfigMap in the release namespace) |
 | `ssh.extraKnownHosts` | `""` | Host keys to trust instead, in `ssh_known_hosts` format |
 | `writeback.pollIntervalSeconds` | `20` | How often queued selections are committed |
-| `theme` | `default` | Dashboard theme: `default`, `fitting-room` or `calibration` (see [Themes](#themes)) |
+| `theme` | `fitting-room` | Dashboard theme: `fitting-room`, `calibration` or `default` (see [Themes](#themes)) |
 | `auth.admin.passwordHash` | `""` | bcrypt/argon2id hash of the admin password. Setting it turns the login on |
 | `auth.admin.username` | `admin` | Admin username |
 | `auth.existingSecret` | `""` | Secret with `admin.password` (and optionally `server.secretkey`), instead of the two values above |
