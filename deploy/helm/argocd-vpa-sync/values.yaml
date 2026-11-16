@@ -55,8 +55,8 @@ theme: fitting-room
 # Admin login, in the style of Argo CD's admin user. With neither
 # auth.admin.passwordHash nor auth.existingSecret set there is no login: the
 # dashboard -- including the actions that queue Git commits -- is open to
-# anyone who can reach the Service. Except with ingress.enabled: then the pod
-# generates a random password on first start and keeps it in the Secret
+# anyone who can reach the Service. Except with ingress.enabled or
+# httpRoute.enabled: then the pod generates a random password on first start and keeps it in the Secret
 # <fullname>-initial-admin-secret (key "password"), like Argo CD's
 # argocd-initial-admin-secret.
 auth:
@@ -81,8 +81,8 @@ auth:
   # (plain-HTTP http://localhost port-forwards are the exception), so turn
   # it off only when serving the dashboard over plain HTTP on another host.
   cookieSecure: true
-  # Expose the Ingress without a login instead of generating a password.
-  # Only for an Ingress already guarded by an authenticating proxy (e.g.
+  # Expose the Ingress/HTTPRoute without a login instead of generating a
+  # password. Only for one already guarded by an authenticating proxy (e.g.
   # oauth2-proxy through ingress.annotations).
   allowOpenIngress: false
 
@@ -110,6 +110,69 @@ ingress:
   #  - secretName: vpa-updater-tls
   #    hosts:
   #      - vpa-updater.example.com
+
+# Gateway API HTTPRoute, an alternative to the Ingress above (needs the
+# Gateway API CRDs and a Gateway to attach to). Like ingress.enabled, it
+# turns the generated admin password on when no login is configured.
+httpRoute:
+  enabled: false
+  annotations: {}
+  labels: {}
+  # Gateway listener(s) to attach to (required), e.g.:
+  #   - name: my-gateway
+  #     namespace: gateway-system
+  #     sectionName: https
+  parentRefs: []
+  hostnames: []
+  #  - vpa-updater.example.com
+  # Match and filters of the rule that forwards to the dashboard's Service.
+  matches:
+    - path:
+        type: PathPrefix
+        value: /
+  filters: []
+  # Rules placed before the one above, e.g. an HTTP -> HTTPS redirect:
+  #   - matches:
+  #       - headers:
+  #           - name: X-Forwarded-Proto
+  #             value: http
+  #     filters:
+  #       - type: RequestRedirect
+  #         requestRedirect:
+  #           scheme: https
+  #           statusCode: 301
+  additionalRules: []
+
+# Gateway API ListenerSet named <fullname>: attaches the dashboard's own
+# listener (and TLS certificate) to a shared Gateway that allows it
+# (spec.allowedListeners), so the Gateway itself needs no per-app listener.
+# Point httpRoute.parentRefs at it:
+#   - group: gateway.networking.k8s.io
+#     kind: ListenerSet
+#     name: <fullname>
+#     sectionName: https
+listenerSet:
+  enabled: false
+  # e.g. cert-manager.io/cluster-issuer: letsencrypt (cert-manager with the
+  # ListenerSets feature gate issues the certificate).
+  annotations: {}
+  labels: {}
+  # Gateway to attach to (required), e.g.:
+  #   name: my-gateway
+  #   namespace: gateway-system
+  parentRef: {}
+  listeners: []
+  #  - name: https
+  #    protocol: HTTPS
+  #    port: 443
+  #    hostname: vpa-updater.example.com
+  #    tls:
+  #      mode: Terminate
+  #      certificateRefs:
+  #        - name: vpa-updater-tls
+  #    allowedRoutes:
+  #      namespaces:
+  #        from: Same
 
 networkPolicy:
   # Restricts ingress to the HTTP port. Egress (Kubernetes API, Git) is not

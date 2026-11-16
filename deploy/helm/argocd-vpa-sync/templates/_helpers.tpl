@@ -50,12 +50,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-An Ingress without a configured password would publish the dashboard with
-no login, so the pod generates one instead (see internal/initialadmin),
-unless auth.allowOpenIngress says an authenticating proxy guards it.
+An Ingress or HTTPRoute without a configured password would publish the
+dashboard with no login, so the pod generates one instead (see
+internal/initialadmin), unless auth.allowOpenIngress says an authenticating
+proxy guards it.
 */}}
+{{- define "argocd-vpa-sync.exposed" -}}
+{{- if or .Values.ingress.enabled .Values.httpRoute.enabled }}true{{ end }}
+{{- end }}
+
 {{- define "argocd-vpa-sync.initialAdmin" -}}
-{{- if and .Values.ingress.enabled (not (include "argocd-vpa-sync.authEnabled" .)) (not .Values.auth.allowOpenIngress) }}true{{ end }}
+{{- if and (include "argocd-vpa-sync.exposed" .) (not (include "argocd-vpa-sync.authEnabled" .)) (not .Values.auth.allowOpenIngress) }}true{{ end }}
 {{- end }}
 
 {{/* Secret the pod creates with the generated admin password. */}}

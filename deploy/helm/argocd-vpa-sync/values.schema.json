@@ -80,6 +80,42 @@
         "tls": { "type": "array" }
       }
     },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "labels": { "type": "object" },
+        "parentRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string", "minLength": 1 } },
+            "required": ["name"]
+          }
+        },
+        "hostnames": { "type": "array", "items": { "type": "string" } },
+        "matches": { "type": "array" },
+        "filters": { "type": "array" },
+        "additionalRules": { "type": "array" }
+      }
+    },
+    "listenerSet": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "labels": { "type": "object" },
+        "parentRef": { "type": "object" },
+        "listeners": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "port", "protocol"]
+          }
+        }
+      }
+    },
     "networkPolicy": {
       "type": "object",
       "properties": {

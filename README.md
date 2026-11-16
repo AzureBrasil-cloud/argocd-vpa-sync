@@ -131,7 +131,7 @@ Argo CD's namespace:
 
 ```sh
 helm install argocd-vpa-sync oci://registry-1.docker.io/azurebrasil/argocd-vpa-sync \
-  --version 0.2.0 --namespace argocd
+  --version 0.3.0 --namespace argocd
 ```
 
 Then opt a VPA in. The VPA must use `updateMode: "Off"`. The binding lives in
@@ -188,8 +188,8 @@ the dashboard, including the actions that queue Git commits. Keep it that
 way only behind a private network, `kubectl port-forward`, or an
 authenticating proxy.
 
-With `ingress.enabled` and no password configured, the login turns on by
-itself: like Argo CD's `argocd-initial-admin-secret`, the pod generates a
+With `ingress.enabled` (or `httpRoute.enabled`) and no password configured,
+the login turns on by itself: like Argo CD's `argocd-initial-admin-secret`, the pod generates a
 random password on its first start and keeps it in the Secret
 `<fullname>-initial-admin-secret` (`argocd-vpa-sync-initial-admin-secret`
 for a release named `argocd-vpa-sync`). Log in as `admin` with:
@@ -202,8 +202,65 @@ Later starts reuse it, so it survives restarts and Argo CD syncs. You can
 remove the `password` key once you've saved it (the pod only needs the
 hash). Delete the whole Secret and restart the pod to generate a new one.
 Helm doesn't manage it, so `helm uninstall` leaves it behind. If an
-authenticating proxy already guards the Ingress, set
+authenticating proxy already guards the Ingress or HTTPRoute, set
 `auth.allowOpenIngress=true` to keep it open instead.
+
+### Exposing it through the Gateway API
+
+Instead of an Ingress, the chart can create an `HTTPRoute` attached to an
+existing Gateway:
+
+```yaml
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - vpa-sync.example.com
+```
+
+`httpRoute.matches` and `httpRoute.filters` shape the rule that forwards to
+the dashboard, and `httpRoute.additionalRules` adds rules before it (for
+example, an HTTP to HTTPS redirect).
+
+When the Gateway is shared and allows
+[ListenerSets](https://gateway-api.sigs.k8s.io/geps/gep-1713/)
+(`spec.allowedListeners`), the chart can also bring the dashboard's own
+HTTPS listener and certificate, so the Gateway needs no per-app listener.
+The ListenerSet is named after the release's full name:
+
+```yaml
+listenerSet:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt   # needs cert-manager's ListenerSets feature gate
+  parentRef:
+    name: my-gateway
+    namespace: gateway-system
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: vpa-sync.example.com
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: vpa-sync-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+httpRoute:
+  enabled: true
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: ListenerSet
+      name: argocd-vpa-sync
+      sectionName: https
+  hostnames:
+    - vpa-sync.example.com
+```
 
 To require a login, set an admin password. As with Argo CD's `admin` user,
 the password is only ever stored as a **bcrypt** or **argon2id** hash:
@@ -297,7 +354,7 @@ spec:
   source:
     repoURL: registry-1.docker.io/azurebrasil
     chart: argocd-vpa-sync
-    targetRevision: 0.2.0
+    targetRevision: 0.3.0
     helm:
       valuesObject:
         theme: fitting-room
@@ -334,8 +391,10 @@ The most common values are below. See
 | `auth.sessionSigningKey` | `""` | Session signing key (at least 32 characters). Random per pod start when empty |
 | `auth.sessionTTL` | `24h` | Session lifetime |
 | `auth.cookieSecure` | `true` | Only send the session cookie over HTTPS |
-| `auth.allowOpenIngress` | `false` | Expose the Ingress without a login instead of generating a password (only behind an authenticating proxy) |
+| `auth.allowOpenIngress` | `false` | Expose the Ingress/HTTPRoute without a login instead of generating a password (only behind an authenticating proxy) |
 | `ingress.enabled` | `false` | Expose the dashboard through an Ingress |
+| `httpRoute.enabled` | `false` | Expose the dashboard through a Gateway API HTTPRoute (`httpRoute.parentRefs` is required) |
+| `listenerSet.enabled` | `false` | Create a Gateway API ListenerSet with the dashboard's own listener(s) on a shared Gateway |
 | `networkPolicy.enabled` | `false` | Only allow traffic to the HTTP port from `networkPolicy.from` |
 
 ---

@@ -5,12 +5,20 @@ Open the dashboard:
 {{- range .Values.ingress.hosts }}
   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
 {{- end }}
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+{{- range .Values.httpRoute.hostnames }}
+  https://{{ . }}
 {{- else }}
+  through the Gateway listener(s) of HTTPRoute {{ include "argocd-vpa-sync.fullname" . }}
+{{- end }}
+{{- end }}
+{{- if not (include "argocd-vpa-sync.exposed" .) }}
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "argocd-vpa-sync.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   http://localhost:{{ .Values.service.port }}
 {{- end }}
 {{ if include "argocd-vpa-sync.initialAdmin" . }}
-The dashboard is exposed through an Ingress, so it requires a login. Log in
+The dashboard is exposed through an {{ if .Values.ingress.enabled }}Ingress{{ else }}HTTPRoute{{ end }}, so it requires a login. Log in
 as "{{ .Values.auth.admin.username }}" with the password the pod generated on its first start:
 
   kubectl -n {{ .Release.Namespace }} get secret {{ include "argocd-vpa-sync.initialAdminSecretName" . }} -o jsonpath='{.data.password}' | base64 -d
